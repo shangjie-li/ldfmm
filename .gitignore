@@ -1,0 +1,8 @@
+.idea
+**__pycache__**
+data/kitti/training
+data/kitti/testing
+*.pyc
+outputs
+checkpoints
+logs

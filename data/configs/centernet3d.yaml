@@ -1,0 +1,36 @@
+random_seed: 444
+
+dataset:
+  type: 'KITTI'
+  batch_size: 2
+  class_names: ['Car', 'Pedestrian', 'Cyclist']
+  write_list: ['Car']
+  random_flip: 0.5
+  random_crop: 0.5
+  scale: 0.4
+  shift: 0.1
+
+model:
+  type: 'CenterNet3D'
+  backbone: 'DLA34'
+  neck: 'DLAUp'
+
+optimizer:
+  type: 'Adam'
+  lr: 0.00125
+  weight_decay: 0.00001
+
+lr_scheduler:
+  warmup: True
+  decay_rate: 0.1
+  decay_list: [40, 60]
+
+trainer:
+  split: 'train'
+  max_epoch: 1
+  save_frequency: 1
+
+tester:
+  split: 'val'
+  score_thresh: 0.2
+  checkpoint: 'checkpoints/checkpoint_epoch_1.pth'
