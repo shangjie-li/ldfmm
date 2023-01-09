@@ -41,6 +41,9 @@ Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
    
    # Display the dataset and show annotations in point clouds
    python dataset_player.py --augment_data --show_boxes3d --show_lidar_points
+   
+   # Display the dataset and show the encoded heatmap
+   python dataset_player.py --augment_data --show_heatmap
    ```
 
 ## Demo

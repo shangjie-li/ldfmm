@@ -10,16 +10,17 @@ except ImportError:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
     import cv2
 
-from centernet3d import build_model
+from ldfmm import build_model
 from helpers.dataloader_helper import build_test_loader
 from helpers.logger_helper import create_logger
+from helpers.logger_helper import log_cfg
 from helpers.logger_helper import set_random_seed
 from helpers.test_helper import Tester
 
 
 def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
-    parser.add_argument('--cfg_file', type=str, default='data/configs/centernet3d.yaml',
+    parser.add_argument('--cfg_file', type=str, default='data/configs/ldfmm.yaml',
                         help='path to the config file')
     parser.add_argument('--result_dir', type=str, default='outputs/data',
                         help='path to save detection results')
@@ -36,14 +37,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, 'log_eval_%s.txt' % datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     logger = create_logger(log_file)
-
-    logger.info('Arguments:')
-    for key, val in vars(args).items():
-        logger.info('  {:20} {}'.format(key, val))
-
-    logger.info('Configuration:')
-    for key, val in cfg.items():
-        logger.info('  {:20} {}'.format(key, val))
+    log_cfg(args, cfg, logger)
 
     logger.info('###################  Evaluation Only  ###################')
     set_random_seed(cfg['random_seed'])

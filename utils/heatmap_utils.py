@@ -67,7 +67,7 @@ def get_poi(features, indices):
     features = features.view(batch_size, -1, num_channels)  # [B, H * W, C]
     indices = indices.unsqueeze(-1).repeat(1, 1, num_channels).long()  # [B, K, C]
 
-    # Select specific features based on POIs
+    # Select specific features based on POIs.
     features = features.gather(dim=1, index=indices)  # [B, K, C]
 
     return features

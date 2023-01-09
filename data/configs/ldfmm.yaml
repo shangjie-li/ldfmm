@@ -11,7 +11,7 @@ dataset:
   shift: 0.1
 
 model:
-  type: 'CenterNet3D'
+  type: 'LDFMM'
   backbone: 'DLA34'
   neck: 'DLAUp'
 

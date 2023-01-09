@@ -18,6 +18,7 @@ def rotate_points_along_z(points, angle):
         0, 0, 1,
     ]).reshape(3, 3)
     points = np.dot(rot_matrix, points.T).T
+
     return points
 
 
@@ -46,6 +47,7 @@ def box3d_lidar_to_corners3d(box3d_lidar):
     corners3d = box3d_lidar[:, 3:6].repeat(8, axis=0) * template
     corners3d = rotate_points_along_z(corners3d.reshape(8, 3), box3d_lidar[0, 6]).reshape(8, 3)
     corners3d += box3d_lidar[:, 0:3]
+
     return corners3d
 
 
@@ -65,4 +67,5 @@ def boxes3d_camera_to_lidar(boxes3d, calib):
     h, w, l = boxes3d[:, 3:4], boxes3d[:, 4:5], boxes3d[:, 5:6]
     xyz = calib.rect_to_lidar(xyz)
     heading = -np.pi / 2 - ry
+
     return np.concatenate([xyz, l, w, h, heading], axis=-1)

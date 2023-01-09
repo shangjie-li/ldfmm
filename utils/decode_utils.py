@@ -1,7 +1,50 @@
 import numpy as np
 
 
+def normalize_angle(angle):
+    """
+
+    Args:
+        angle:
+
+    Returns:
+
+    """
+    sina = np.sin(angle)
+    cosa = np.cos(angle)
+
+    return np.arctan2(sina, cosa)
+
+
+def bin_to_angle(bin_id, residual_angle):
+    """
+
+    Args:
+        bin_id:
+        residual_angle:
+
+    Returns:
+
+    """
+    angle_per_bin = 2 * np.pi / 12
+    angle_center = bin_id * angle_per_bin
+    angle = angle_center + residual_angle
+
+    return normalize_angle(angle)
+
+
 def decode_detections(preds, infos, calibs, score_thresh):
+    """
+
+    Args:
+        preds:
+        infos:
+        calibs:
+        score_thresh:
+
+    Returns:
+
+    """
     det = {}
     batch_size, K, _ = preds['cls_id'].shape
     for i in range(batch_size):
@@ -42,18 +85,3 @@ def decode_detections(preds, infos, calibs, score_thresh):
         det[img_id] = det_per_img
 
     return det
-
-
-def normalize_angle(angle):
-    sina = np.sin(angle)
-    cosa = np.cos(angle)
-
-    return np.arctan2(sina, cosa)
-
-
-def bin_to_angle(bin_id, residual_angle):
-    angle_per_bin = 2 * np.pi / 12
-    angle_center = bin_id * angle_per_bin
-    angle = angle_center + residual_angle
-
-    return normalize_angle(angle)

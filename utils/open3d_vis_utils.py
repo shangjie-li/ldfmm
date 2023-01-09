@@ -11,14 +11,14 @@ box_colormap = {
 }  # RGB
 
 
-def draw_scenes(points, boxes3d_lidar=None, class_names=None, point_colors=None, point_size=1.0, window_name='points'):
+def draw_scene(points, boxes3d_lidar=None, names=None, point_colors=None, point_size=1.0, window_name='points'):
     """
-    Draw lidar point clouds with 3D boxes.
+    Show lidar point clouds with 3D boxes.
 
     Args:
         points: ndarray of float32, [N, 3], (x, y, z) in lidar coordinates
         boxes3d_lidar: ndarray of float32, [N, 7], (x, y, z, l, w, h, heading) in lidar coordinates
-        class_names: list of str, names
+        names: list of str, name of each object
         point_colors: ndarray of float32, [N, 3], (r, g, b) values (between 0 and 1)
         point_size: float
         window_name: str
@@ -41,13 +41,13 @@ def draw_scenes(points, boxes3d_lidar=None, class_names=None, point_colors=None,
         pts.colors = open3d.utility.Vector3dVector(np.ones((points.shape[0], 3)) * 0.9)
 
     if boxes3d_lidar is not None:
-        vis = draw_boxes3d(vis, boxes3d_lidar, class_names)
+        vis = draw_boxes3d(vis, boxes3d_lidar, names)
 
     vis.run()
     vis.destroy_window()
 
 
-def draw_boxes3d(vis, boxes3d_lidar, class_names=None, color=(0, 1, 0)):
+def draw_boxes3d(vis, boxes3d_lidar, names=None, color=(0, 1, 0)):
     """
     Draw 3D boxes as following in lidar point clouds.
         7 -------- 4
@@ -61,7 +61,7 @@ def draw_boxes3d(vis, boxes3d_lidar, class_names=None, color=(0, 1, 0)):
     Args:
         vis: open3d.visualization.Visualizer
         boxes3d_lidar: ndarray of float32, [N, 7], (x, y, z, l, w, h, heading) in lidar coordinates
-        class_names: list of str, names
+        names: list of str, name of each object
         color: tuple
 
     Returns:
@@ -81,8 +81,8 @@ def draw_boxes3d(vis, boxes3d_lidar, class_names=None, color=(0, 1, 0)):
         line_set.points = open3d.utility.Vector3dVector(corners3d)
         line_set.lines = open3d.Vector2iVector(edges)
 
-        if class_names is not None:
-            color = box_colormap[class_names[i]]
+        if names is not None:
+            color = box_colormap[names[i]]
         line_set.paint_uniform_color(color)
 
         vis.add_geometry(line_set)

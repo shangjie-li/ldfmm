@@ -9,8 +9,8 @@ from data.kitti_object_eval_python.eval import get_official_eval_result
 from utils.encode_utils import angle_to_bin
 from utils.encode_utils import gaussian_radius
 from utils.encode_utils import draw_umich_gaussian
-from utils.encode_utils import affine_transform
-from utils.encode_utils import get_affine_transform
+from utils.affine_utils import get_affine_mat
+from utils.affine_utils import affine_transform
 from utils.kitti_object3d_utils import parse_objects
 from utils.kitti_calibration_utils import parse_calib
 from utils.point_clouds_utils import get_completed_lidar_projection_map
@@ -119,7 +119,7 @@ class KITTIDataset(Dataset):
                 center[1] += img_size[1] * np.clip(np.random.randn() * self.shift, -2 * self.shift, 2 * self.shift)
 
         # affine_mat: ndarray of float32, [2, 3]
-        affine_mat, affine_mat_inv = get_affine_transform(center, aug_size, 0, self.resolution)
+        affine_mat, affine_mat_inv = get_affine_mat(center, aug_size, 0, self.resolution)
         img = cv2.warpAffine(
             img, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
         lidar_projection_map = cv2.warpAffine(
@@ -136,6 +136,7 @@ class KITTIDataset(Dataset):
             'img_size': img_size,
             'original_downsample': img_size / feature_size,
             'affine_mat': affine_mat,
+            'affine_mat_inv': affine_mat_inv,
         }
 
         if self.split == 'test':
@@ -155,6 +156,7 @@ class KITTIDataset(Dataset):
             'mask_3d': np.zeros((self.max_objs,), dtype=np.uint8),
             'flip_flag': np.zeros((self.max_objs,), dtype=np.uint8),
             'crop_flag': np.zeros((self.max_objs,), dtype=np.uint8),
+            'cls_id': np.zeros((self.max_objs,), dtype=np.int64) - 1,
         }
 
         num_objs = len(objects) if len(objects) < self.max_objs else self.max_objs
@@ -208,5 +210,6 @@ class KITTIDataset(Dataset):
             target['mask_3d'][i] = 1 if not random_crop_flag else 0
             target['flip_flag'][i] = random_flip_flag
             target['crop_flag'][i] = random_crop_flag
+            target['cls_id'][i] = cls_id
 
         return img, target, info, lidar_projection_map

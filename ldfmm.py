@@ -12,13 +12,13 @@ from utils.loss_utils import focal_loss
 
 
 def build_model(cfg, num_classes):
-    if cfg['type'] == 'CenterNet3D':
-        return CenterNet3D(backbone=cfg['backbone'], neck=cfg['neck'], num_classes=num_classes)
+    if cfg['type'] == 'LDFMM':
+        return LDFMM(backbone=cfg['backbone'], neck=cfg['neck'], num_classes=num_classes)
     else:
         raise NotImplementedError
 
 
-class CenterNet3D(nn.Module):
+class LDFMM(nn.Module):
     def __init__(self, backbone, neck, num_classes, downsample=4):
         super().__init__()
         if backbone == 'DLA34':
