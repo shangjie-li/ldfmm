@@ -5,9 +5,10 @@ def normalize_angle(angle):
     """
 
     Args:
-        angle:
+        angle: float or ndarray of float, angle in rad
 
     Returns:
+        angle: float or ndarray of float, angle in rad
 
     """
     sina = np.sin(angle)
@@ -20,10 +21,11 @@ def bin_to_angle(bin_id, residual_angle):
     """
 
     Args:
-        bin_id:
-        residual_angle:
+        bin_id: int, bin id (0 to 11)
+        residual_angle: float, angle in rad
 
     Returns:
+        angle: float, angle in rad
 
     """
     angle_per_bin = 2 * np.pi / 12
@@ -33,16 +35,17 @@ def bin_to_angle(bin_id, residual_angle):
     return normalize_angle(angle)
 
 
-def decode_detections(preds, infos, calibs, score_thresh):
+def decode_detections(preds, infos, calibs, score_thresh=0.2):
     """
 
     Args:
-        preds:
-        infos:
-        calibs:
-        score_thresh:
+        preds: dict
+        infos: dict
+        calibs: list
+        score_thresh: float
 
     Returns:
+        det: dict
 
     """
     det = {}

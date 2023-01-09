@@ -5,12 +5,13 @@ def angle_to_bin(angle):
     """
 
     Args:
-        angle:
+        angle: float, angle in rad
 
     Returns:
+        bin_id: int, bin id (0 to 11)
+        residual_angle: float, angle in rad
 
     """
-    angle = angle % (2 * np.pi)
     angle_per_bin = 2 * np.pi / 12
     shifted_angle = (angle + angle_per_bin / 2) % (2 * np.pi)
     bin_id = int(shifted_angle / angle_per_bin)
@@ -23,10 +24,11 @@ def gaussian_radius(bbox_size, min_overlap=0.7):
     """
 
     Args:
-        bbox_size:
-        min_overlap:
+        bbox_size: ndarray of float, [2], (w, h) of the bounding box
+        min_overlap: float
 
     Returns:
+        radius: float
 
     """
     height, width = bbox_size
@@ -49,19 +51,22 @@ def gaussian_radius(bbox_size, min_overlap=0.7):
     sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
     r3 = (b3 + sq3) / 2
 
-    return min(r1, r2, r3)
+    radius = min(r1, r2, r3)
+
+    return radius
 
 
 def draw_umich_gaussian(heatmap, center, radius, k=1):
     """
 
     Args:
-        heatmap:
-        center:
-        radius:
-        k:
+        heatmap: ndarray of float32, [C, H, W], heatmap (0 to 1)
+        center: ndarray of float32, [2], (u, v)
+        radius: float
+        k: int
 
     Returns:
+        heatmap: ndarray of float32, [C, H, W], heatmap (0 to 1)
 
     """
     def gaussian2d(shape, sigma=1):
@@ -71,6 +76,7 @@ def draw_umich_gaussian(heatmap, center, radius, k=1):
         h[h < np.finfo(h.dtype).eps * h.max()] = 0
         return h
 
+    radius = int(radius)
     diameter = 2 * radius + 1
     gaussian = gaussian2d((diameter, diameter), sigma=diameter / 6)
     x, y = int(center[0]), int(center[1])

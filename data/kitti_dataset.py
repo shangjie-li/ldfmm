@@ -118,8 +118,8 @@ class KITTIDataset(Dataset):
                 center[0] += img_size[0] * np.clip(np.random.randn() * self.shift, -2 * self.shift, 2 * self.shift)
                 center[1] += img_size[1] * np.clip(np.random.randn() * self.shift, -2 * self.shift, 2 * self.shift)
 
-        # affine_mat: ndarray of float32, [2, 3]
-        affine_mat, affine_mat_inv = get_affine_mat(center, aug_size, 0, self.resolution)
+        # affine_mat: ndarray of float, [2, 3]
+        affine_mat = get_affine_mat(center, aug_size, self.resolution)
         img = cv2.warpAffine(
             img, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
         lidar_projection_map = cv2.warpAffine(
@@ -136,7 +136,6 @@ class KITTIDataset(Dataset):
             'img_size': img_size,
             'original_downsample': img_size / feature_size,
             'affine_mat': affine_mat,
-            'affine_mat_inv': affine_mat_inv,
         }
 
         if self.split == 'test':
