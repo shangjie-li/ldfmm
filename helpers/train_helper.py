@@ -8,7 +8,8 @@ from helpers.checkpoint_helper import load_checkpoint
 
 
 class Trainer(object):
-    def __init__(self, cfg, model, optimizer, lr_scheduler, warmup_lr_scheduler, train_loader, test_loader, logger):
+    def __init__(self, cfg, model, optimizer, lr_scheduler, warmup_lr_scheduler, train_loader, test_loader,
+                 logger, tb_logger):
         self.cfg = cfg
         self.model = model
         self.optimizer = optimizer
@@ -17,7 +18,9 @@ class Trainer(object):
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.logger = logger
+        self.tb_logger = tb_logger
         self.epoch = 0
+        self.iter = 0
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(self.device)
 
@@ -79,6 +82,12 @@ class Trainer(object):
             total_loss, stats_dict = self.model.compute_loss(outputs, targets, lidar_maps)
             total_loss.backward()
             self.optimizer.step()
+
+            self.tb_logger.add_scalar('learning_rate/learning_rate', self.optimizer.param_groups[0]['lr'], self.iter)
+            self.tb_logger.add_scalar('loss/loss', total_loss.item(), self.iter)
+            for key, val in stats_dict.items():
+                self.tb_logger.add_scalar('sub_loss/' + key, val, self.iter)
+            self.iter += 1
 
             progress_bar.update()
         progress_bar.close()

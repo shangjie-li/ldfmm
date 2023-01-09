@@ -2,6 +2,7 @@ import os
 import yaml
 import argparse
 import datetime
+from tensorboardX import SummaryWriter
 
 try:
     import cv2
@@ -48,6 +49,8 @@ def main():
     logger = create_logger(log_file)
     log_cfg(args, cfg, logger)
 
+    tb_logger = SummaryWriter(log_dir=log_dir)
+
     logger.info('###################  Training  ###################')
     set_random_seed(cfg['random_seed'])
 
@@ -69,6 +72,7 @@ def main():
         train_loader=train_loader,
         test_loader=test_loader,
         logger=logger,
+        tb_logger=tb_logger,
     )
     trainer.train()
 
