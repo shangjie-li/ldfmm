@@ -76,7 +76,7 @@ class LDFMM(nn.Module):
 
         return ret
 
-    def select_outputs(self, outputs, K=50, lidar_maps=None):
+    def select_outputs(self, outputs, K, lidar_maps=None):
         heatmaps = outputs['heatmap']
         batch_size = heatmaps.shape[0]
         heatmaps = torch.clamp(heatmaps.sigmoid_(), min=1e-4, max=1 - 1e-4)
@@ -117,11 +117,9 @@ class LDFMM(nn.Module):
 
     def compute_loss(self, outputs, targets, lidar_maps):
         try:
-            mask_2d = targets['mask_2d'].bool()
-            mask_3d = targets['mask_3d'].bool()
+            mask = targets['mask'].bool()
         except AttributeError:
-            mask_2d = targets['mask_2d']
-            mask_3d = targets['mask_3d']
+            mask = targets['mask']
 
         gt_keypoints = targets['keypoint']
 
@@ -130,35 +128,35 @@ class LDFMM(nn.Module):
         gt_heatmaps = targets['heatmap']
         heatmap_loss = focal_loss(heatmaps, gt_heatmaps)
 
-        offsets2d = get_poi(outputs['offset2d'], gt_keypoints)[mask_2d].view(-1, 2)
-        gt_offsets2d = targets['offset2d'][mask_2d].view(-1, 2)
+        offsets2d = get_poi(outputs['offset2d'], gt_keypoints)[mask].view(-1, 2)
+        gt_offsets2d = targets['offset2d'][mask].view(-1, 2)
         offset2d_loss = F.l1_loss(offsets2d, gt_offsets2d)
 
-        sizes2d = get_poi(outputs['size2d'], gt_keypoints)[mask_2d].view(-1, 2)
-        gt_sizes2d = targets['box2d'][:, :, 2:4][mask_2d].view(-1, 2)
+        sizes2d = get_poi(outputs['size2d'], gt_keypoints)[mask].view(-1, 2)
+        gt_sizes2d = targets['box2d'][:, :, 2:4][mask].view(-1, 2)
         size2d_loss = F.l1_loss(sizes2d, gt_sizes2d)
 
-        offsets3d = get_poi(outputs['offset3d'], gt_keypoints)[mask_3d].view(-1, 2)
-        gt_offsets3d = targets['offset3d'][mask_3d].view(-1, 2)
+        offsets3d = get_poi(outputs['offset3d'], gt_keypoints)[mask].view(-1, 2)
+        gt_offsets3d = targets['offset3d'][mask].view(-1, 2)
         offset3d_loss = F.l1_loss(offsets3d, gt_offsets3d)
 
-        lidar_maps = get_poi(lidar_maps, gt_keypoints)[mask_3d].view(-1, 3)
-        depths = get_poi(outputs['depth'], gt_keypoints)[mask_3d].view(-1, 1)
+        lidar_maps = get_poi(lidar_maps, gt_keypoints)[mask].view(-1, 3)
+        depths = get_poi(outputs['depth'], gt_keypoints)[mask].view(-1, 1)
         depths += lidar_maps[:, 2:3]
-        gt_depths = targets['box3d'][:, :, 2:3][mask_3d].view(-1, 1)
+        gt_depths = targets['box3d'][:, :, 2:3][mask].view(-1, 1)
         depth_loss = F.l1_loss(depths, gt_depths)
 
-        sizes3d = get_poi(outputs['size3d'], gt_keypoints)[mask_3d].view(-1, 3)
-        gt_sizes3d = targets['box3d'][:, :, 3:6][mask_3d].view(-1, 3)
+        sizes3d = get_poi(outputs['size3d'], gt_keypoints)[mask].view(-1, 3)
+        gt_sizes3d = targets['box3d'][:, :, 3:6][mask].view(-1, 3)
         size3d_loss = F.l1_loss(sizes3d, gt_sizes3d)
 
-        alphas_bin = get_poi(outputs['alpha_bin'], gt_keypoints)[mask_2d].view(-1, 12)
-        gt_alphas_bin = targets['alpha_bin'][mask_2d].view(-1, 1)
+        alphas_bin = get_poi(outputs['alpha_bin'], gt_keypoints)[mask].view(-1, 12)
+        gt_alphas_bin = targets['alpha_bin'][mask].view(-1, 1)
         alpha_bin_loss = F.cross_entropy(alphas_bin, gt_alphas_bin.view(-1))
 
-        alphas_res = get_poi(outputs['alpha_res'], gt_keypoints)[mask_2d].view(-1, 12)
+        alphas_res = get_poi(outputs['alpha_res'], gt_keypoints)[mask].view(-1, 12)
         alphas_res = alphas_res.gather(dim=1, index=gt_alphas_bin.view(-1, 1)).view(-1, 1)
-        gt_alphas_res = targets['alpha_res'][mask_2d].view(-1, 1)
+        gt_alphas_res = targets['alpha_res'][mask].view(-1, 1)
         alpha_res_loss = F.l1_loss(alphas_res, gt_alphas_res)
 
         total_loss = heatmap_loss

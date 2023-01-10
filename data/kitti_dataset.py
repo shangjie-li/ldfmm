@@ -26,7 +26,7 @@ class KITTIDataset(Dataset):
         for i, name in enumerate(self.class_names):
             self.cls_to_id[name] = i
         self.resolution = np.array([1280, 384])
-        self.max_objs = 30
+        self.max_objs = 50
         self.write_list = cfg['write_list']
 
         assert self.split in ['train', 'val', 'trainval', 'test']
@@ -42,6 +42,8 @@ class KITTIDataset(Dataset):
         self.augment_data = augment_data
         if split not in ['train', 'trainval']:
             self.augment_data = False
+        self.min_distance = cfg['min_distance']
+        self.max_distance = cfg['max_distance']
         self.random_flip = cfg['random_flip']
         self.random_crop = cfg['random_crop']
         self.scale = cfg['scale']
@@ -151,18 +153,18 @@ class KITTIDataset(Dataset):
             'box3d': np.zeros((self.max_objs, 7), dtype=np.float32),  # (x, y, z, h, w, l, ry) in camera coordinates
             'alpha_bin': np.zeros((self.max_objs, 1), dtype=np.int64),
             'alpha_res': np.zeros((self.max_objs, 1), dtype=np.float32),
-            'mask_2d': np.zeros((self.max_objs,), dtype=np.uint8),
-            'mask_3d': np.zeros((self.max_objs,), dtype=np.uint8),
             'flip_flag': np.zeros((self.max_objs,), dtype=np.uint8),
             'crop_flag': np.zeros((self.max_objs,), dtype=np.uint8),
             'cls_id': np.zeros((self.max_objs,), dtype=np.int64) - 1,
+            'mask': np.zeros((self.max_objs,), dtype=np.int64),
         }
 
-        num_objs = len(objects) if len(objects) < self.max_objs else self.max_objs
+        num_objs = len(objects) if len(objects) <= self.max_objs else self.max_objs
         for i in range(num_objs):
             obj = objects[i]
             if obj.cls_type not in self.write_list: continue
-            if obj.level_str == 'UnKnown' or obj.loc[-1] < 2 or obj.loc[-1] > 65: continue
+            if obj.level_str == 'UnKnown': continue
+            if obj.loc[-1] < self.min_distance or obj.loc[-1] > self.max_distance: continue
 
             box2d = obj.box2d.copy()  # (u1, v1, u2, v2)
             if random_flip_flag:
@@ -205,10 +207,9 @@ class KITTIDataset(Dataset):
             target['box3d'][i] = box3d
             target['alpha_bin'][i] = alpha_bin
             target['alpha_res'][i] = alpha_res
-            target['mask_2d'][i] = 1
-            target['mask_3d'][i] = 1 if not random_crop_flag else 0
             target['flip_flag'][i] = random_flip_flag
             target['crop_flag'][i] = random_crop_flag
             target['cls_id'][i] = cls_id
+            target['mask'][i] = 1
 
         return img, target, info, lidar_projection_map

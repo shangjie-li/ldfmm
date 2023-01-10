@@ -5,6 +5,8 @@ dataset:
   batch_size: 2
   class_names: ['Car', 'Pedestrian', 'Cyclist']
   write_list: ['Car']
+  min_distance: 2.0
+  max_distance: 65.0
   random_flip: 0.5
   random_crop: 0.5
   scale: 0.4

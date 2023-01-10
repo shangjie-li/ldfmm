@@ -58,20 +58,16 @@ def main():
         lpm = cv2.resize(lpm, dsize=dataset.resolution, interpolation=cv2.INTER_NEAREST)
         lpm = opencv_vis_utils.normalize_img(lpm)
 
+        mask = target['mask'].astype(np.bool)
+
         heatmap = target['heatmap']
-        mask_2d = target['mask_2d'].astype(np.bool)
-        mask_3d = target['mask_3d'].astype(np.bool)
+        keypoints = target['keypoint'][mask]  # (u, v) of keypoints
+        boxes2d = target['box2d'][mask]  # (cu, cv, width, height) of bounding boxes
+        boxes3d = target['box3d'][mask]  # (x, y, z, h, w, l, ry) in camera coordinates
+        flip_flag = target['flip_flag'][mask]
+        cls_ids = target['cls_id'][mask]
 
-        keypoints = target['keypoint'][mask_2d]  # (u, v) of keypoints
-        boxes2d = target['box2d'][mask_2d]  # (cu, cv, width, height) of bounding boxes
-        boxes3d = target['box3d'][mask_3d]  # (x, y, z, h, w, l, ry) in camera coordinates
-        flip_flag = target['flip_flag'][mask_3d]
-
-        cls_ids_2d = target['cls_id'][mask_2d]
-        names_2d = [dataset.class_names[idx] for idx in cls_ids_2d]
-
-        cls_ids_3d = target['cls_id'][mask_3d]
-        names_3d = [dataset.class_names[idx] for idx in cls_ids_3d]
+        names = [dataset.class_names[idx] for idx in cls_ids]
 
         if args.show_lidar_points:
             boxes3d_lidar = boxes3d_camera_to_lidar(boxes3d, calib)
@@ -80,7 +76,7 @@ def main():
             open3d_vis_utils.draw_scene(
                 pts_lidar,
                 boxes3d_lidar=boxes3d_lidar if args.show_boxes3d else None,
-                names=names_3d,
+                names=names,
             )
         elif args.show_heatmap:
             heatmap = np.stack([
@@ -106,9 +102,8 @@ def main():
                     calib,
                     keypoints=keypoints if args.show_keypoints else None,
                     boxes2d=boxes2d if args.show_boxes2d else None,
-                    names_2d=names_2d,
                     boxes3d_camera=boxes3d if args.show_boxes3d else None,
-                    names_3d=names_3d,
+                    names=names,
                     flip_flag=flip_flag,
                     info=info,
                     window_name=key,

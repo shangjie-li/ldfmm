@@ -38,7 +38,7 @@ def normalize_img(img):
         raise NotImplementedError
 
 
-def draw_scene(img, calib, keypoints=None, boxes2d=None, names_2d=None, boxes3d_camera=None, names_3d=None,
+def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, names=None,
                flip_flag=None, info=None, window_name='image', wait_key=True, enter_to_save=True):
     """
     Show the image with 2D boxes or 3D boxes.
@@ -48,9 +48,8 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, names_2d=None, boxes3d_
         calib: kitti_calibration_utils.Calibration
         keypoints: ndarray of float32, [N, 2], (u, v) of keypoints
         boxes2d: ndarray of float32, [N, 4], (cu, cv, width, height) of bounding boxes
-        names_2d: list of str, name of each object
         boxes3d_camera: ndarray of float32, [N, 7], (x, y, z, h, w, l, ry] in camera coordinates
-        names_3d: list of str, name of each object
+        names: list of str, name of each object
         flip_flag: ndarray of uint8, [N]
         info: dict
         window_name: str
@@ -61,13 +60,13 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, names_2d=None, boxes3d_
 
     """
     if keypoints is not None:
-        img = draw_keypoints(img, keypoints, names_2d)
+        img = draw_keypoints(img, keypoints, names)
 
     if boxes2d is not None:
-        img = draw_boxes2d(img, boxes2d, names_2d)
+        img = draw_boxes2d(img, boxes2d, names)
 
     if boxes3d_camera is not None:
-        img = draw_boxes3d(img, calib, boxes3d_camera, names_3d, flip_flag, info)
+        img = draw_boxes3d(img, calib, boxes3d_camera, names, flip_flag, info)
 
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, img.shape[1], img.shape[0])
