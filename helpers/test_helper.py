@@ -50,6 +50,7 @@ class Tester(object):
                 preds=preds,
                 infos=infos,
                 calibs=calibs,
+                regress_box2d=self.model.regress_box2d,
                 score_thresh=self.cfg['score_thresh'],
             )
             all_det.update(det)

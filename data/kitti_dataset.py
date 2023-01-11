@@ -33,14 +33,14 @@ class KITTIDataset(Dataset):
         self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
         self.id_list = [x.strip() for x in open(self.split_file).readlines()]
 
-        self.root_dir = os.path.join(self.root_dir, 'testing' if split == 'test' else 'training')
+        self.root_dir = os.path.join(self.root_dir, 'testing' if self.split == 'test' else 'training')
         self.image_dir = os.path.join(self.root_dir, 'image_2')
         self.velodyne_dir = os.path.join(self.root_dir, 'velodyne')
         self.calib_dir = os.path.join(self.root_dir, 'calib')
         self.label_dir = os.path.join(self.root_dir, 'label_2')
 
         self.augment_data = augment_data
-        if split not in ['train', 'trainval']:
+        if self.split not in ['train', 'trainval']:
             self.augment_data = False
         self.min_distance = cfg['min_distance']
         self.max_distance = cfg['max_distance']
@@ -146,11 +146,11 @@ class KITTIDataset(Dataset):
         objects = self.get_label(img_id)
         target = {
             'heatmap': np.zeros((self.num_classes, feature_size[1], feature_size[0]), dtype=np.float32),
-            'keypoint': np.zeros((self.max_objs, 2), dtype=np.int64),  # (u, v) of keypoints
-            'offset2d': np.zeros((self.max_objs, 2), dtype=np.float32),  # (du, dv) from 2D centers to keypoints
-            'box2d': np.zeros((self.max_objs, 4), dtype=np.float32),  # (cu, cv, width, height) of bounding boxes
-            'offset3d': np.zeros((self.max_objs, 2), dtype=np.float32),  # (du, dv) from proj 3D centers to keypoints
-            'box3d': np.zeros((self.max_objs, 7), dtype=np.float32),  # (x, y, z, h, w, l, ry) in camera coordinates
+            'keypoint': np.zeros((self.max_objs, 2), dtype=np.int64),  # (u, v)
+            'offset2d': np.zeros((self.max_objs, 2), dtype=np.float32),  # (du, dv)
+            'box2d': np.zeros((self.max_objs, 4), dtype=np.float32),  # (cu, cv, width, height)
+            'offset3d': np.zeros((self.max_objs, 2), dtype=np.float32),  # (du, dv)
+            'box3d': np.zeros((self.max_objs, 7), dtype=np.float32),  # (x, y, z, h, w, l, ry)
             'alpha_bin': np.zeros((self.max_objs, 1), dtype=np.int64),
             'alpha_res': np.zeros((self.max_objs, 1), dtype=np.float32),
             'flip_flag': np.zeros((self.max_objs,), dtype=np.uint8),
@@ -180,19 +180,19 @@ class KITTIDataset(Dataset):
             size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
             alpha = obj.alpha
             ry = obj.ry
-            center3d_proj, _ = calib.rect_to_img(center3d.reshape(-1, 3))
-            center3d_proj = center3d_proj.squeeze()
+            center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
+            center3d_img = center3d_img.squeeze()
             if random_flip_flag:
-                center3d_proj[0] = img_size[0] - center3d_proj[0]
+                center3d_img[0] = img_size[0] - center3d_img[0]
                 center3d[0] *= -1
                 alpha = np.pi - alpha
                 ry = np.pi - ry
             box3d = np.array([*center3d, *size3d, ry], dtype=np.float32)
             alpha_bin, alpha_res = angle_to_bin(alpha)
-            center3d_proj = affine_transform(center3d_proj.reshape(-1, 2), affine_mat).squeeze()
-            center3d_proj /= self.downsample
+            center3d_img = affine_transform(center3d_img.reshape(-1, 2), affine_mat).squeeze()
+            center3d_img /= self.downsample
 
-            keypoint = center3d_proj.astype(np.int64)
+            keypoint = center3d_img.astype(np.int64)
             if keypoint[0] < 0 or keypoint[0] >= feature_size[0]: continue
             if keypoint[1] < 0 or keypoint[1] >= feature_size[1]: continue
             radius = gaussian_radius(size2d)
@@ -203,7 +203,7 @@ class KITTIDataset(Dataset):
             target['keypoint'][i] = keypoint
             target['offset2d'][i] = center2d - keypoint
             target['box2d'][i] = box2d
-            target['offset3d'][i] = center3d_proj - keypoint
+            target['offset3d'][i] = center3d_img - keypoint
             target['box3d'][i] = box3d
             target['alpha_bin'][i] = alpha_bin
             target['alpha_res'][i] = alpha_res
@@ -211,5 +211,9 @@ class KITTIDataset(Dataset):
             target['crop_flag'][i] = random_crop_flag
             target['cls_id'][i] = cls_id
             target['mask'][i] = 1
+
+        if self.split in ['train', 'trainval'] and target['mask'].sum() == 0:
+            new_idx = np.random.randint(self.__len__())
+            return self.__getitem__(new_idx)
 
         return img, target, info, lidar_projection_map

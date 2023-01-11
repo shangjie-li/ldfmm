@@ -13,13 +13,15 @@ from utils.loss_utils import focal_loss
 
 def build_model(cfg, num_classes):
     if cfg['type'] == 'LDFMM':
-        return LDFMM(backbone=cfg['backbone'], neck=cfg['neck'], num_classes=num_classes)
+        return LDFMM(
+            backbone=cfg['backbone'], neck=cfg['neck'], regress_box2d=cfg['regress_box2d'], num_classes=num_classes,
+        )
     else:
         raise NotImplementedError
 
 
 class LDFMM(nn.Module):
-    def __init__(self, backbone, neck, num_classes, downsample=4):
+    def __init__(self, backbone, neck, regress_box2d, num_classes, downsample=4):
         super().__init__()
         if backbone == 'DLA34':
             self.backbone = dla.dla34(pretrained=True, return_levels=True)
@@ -36,16 +38,21 @@ class LDFMM(nn.Module):
         else:
             raise NotImplementedError
 
+        self.regress_box2d = regress_box2d
         self.heads = {
             'heatmap': num_classes,
-            'offset2d': 2,
-            'size2d': 2,
             'offset3d': 2,
             'depth': 1,
             'size3d': 3,
             'alpha_bin': 12,
             'alpha_res': 12,
         }
+        if self.regress_box2d:
+            self.heads.update({
+                'offset2d': 2,
+                'size2d': 2,
+            })
+
         for head in self.heads.keys():
             num_channels = self.heads[head]
             fc = nn.Sequential(
@@ -84,13 +91,8 @@ class LDFMM(nn.Module):
 
         scores, indices, cls_ids, xs, ys = select_topk(heatmaps, K=K)
 
-        offsets2d = get_poi(outputs['offset2d'], indices)
-        centers2d = torch.stack([xs, ys], dim=2) + offsets2d
-
-        sizes2d = get_poi(outputs['size2d'], indices)
-
         offsets3d = get_poi(outputs['offset3d'], indices)
-        centers3d_proj = torch.stack([xs, ys], dim=2) + offsets3d
+        centers3d_img = torch.stack([xs, ys], dim=2) + offsets3d
 
         lidar_maps = get_poi(lidar_maps, indices)
         depths = get_poi(outputs['depth'], indices)
@@ -104,14 +106,23 @@ class LDFMM(nn.Module):
         preds = {
             'cls_id': cls_ids.view(batch_size, K, 1),
             'score': scores.view(batch_size, K, 1),
-            'center2d': centers2d.view(batch_size, K, 2),
-            'size2d': sizes2d.view(batch_size, K, 2),
-            'center3d_proj': centers3d_proj.view(batch_size, K, 2),
+            'center3d_img': centers3d_img.view(batch_size, K, 2),
             'depth': depths.view(batch_size, K, 1),
             'size3d': sizes3d.view(batch_size, K, 3),
             'alpha_bin': alphas_bin.view(batch_size, K, 12),
             'alpha_res': alphas_res.view(batch_size, K, 12),
         }
+
+        if self.regress_box2d:
+            offsets2d = get_poi(outputs['offset2d'], indices)
+            centers2d = torch.stack([xs, ys], dim=2) + offsets2d
+
+            sizes2d = get_poi(outputs['size2d'], indices)
+
+            preds.update({
+                'center2d': centers2d.view(batch_size, K, 2),
+                'size2d': sizes2d.view(batch_size, K, 2),
+            })
 
         return preds
 
@@ -127,14 +138,6 @@ class LDFMM(nn.Module):
         heatmaps = torch.clamp(heatmaps.sigmoid_(), min=1e-4, max=1 - 1e-4)
         gt_heatmaps = targets['heatmap']
         heatmap_loss = focal_loss(heatmaps, gt_heatmaps)
-
-        offsets2d = get_poi(outputs['offset2d'], gt_keypoints)[mask].view(-1, 2)
-        gt_offsets2d = targets['offset2d'][mask].view(-1, 2)
-        offset2d_loss = F.l1_loss(offsets2d, gt_offsets2d)
-
-        sizes2d = get_poi(outputs['size2d'], gt_keypoints)[mask].view(-1, 2)
-        gt_sizes2d = targets['box2d'][:, :, 2:4][mask].view(-1, 2)
-        size2d_loss = F.l1_loss(sizes2d, gt_sizes2d)
 
         offsets3d = get_poi(outputs['offset3d'], gt_keypoints)[mask].view(-1, 2)
         gt_offsets3d = targets['offset3d'][mask].view(-1, 2)
@@ -159,19 +162,29 @@ class LDFMM(nn.Module):
         gt_alphas_res = targets['alpha_res'][mask].view(-1, 1)
         alpha_res_loss = F.l1_loss(alphas_res, gt_alphas_res)
 
-        total_loss = heatmap_loss
-        total_loss += offset2d_loss + size2d_loss
-        total_loss += offset3d_loss + depth_loss + size3d_loss + alpha_bin_loss + alpha_res_loss
-
+        total_loss = heatmap_loss + offset3d_loss + depth_loss + size3d_loss + alpha_bin_loss + alpha_res_loss
         stats_dict = {
             'heatmap': heatmap_loss.item(),
-            'offset2d': offset2d_loss.item(),
-            'size2d': size2d_loss.item(),
             'offset3d': offset3d_loss.item(),
             'depth': depth_loss.item(),
             'size3d': size3d_loss.item(),
             'alpha_bin': alpha_bin_loss.item(),
             'alpha_res': alpha_res_loss.item(),
         }
+
+        if self.regress_box2d:
+            offsets2d = get_poi(outputs['offset2d'], gt_keypoints)[mask].view(-1, 2)
+            gt_offsets2d = targets['offset2d'][mask].view(-1, 2)
+            offset2d_loss = F.l1_loss(offsets2d, gt_offsets2d)
+
+            sizes2d = get_poi(outputs['size2d'], gt_keypoints)[mask].view(-1, 2)
+            gt_sizes2d = targets['box2d'][:, :, 2:4][mask].view(-1, 2)
+            size2d_loss = F.l1_loss(sizes2d, gt_sizes2d)
+
+            total_loss += offset2d_loss + size2d_loss
+            stats_dict.update({
+                'offset2d': offset2d_loss.item(),
+                'size2d': size2d_loss.item(),
+            })
 
         return total_loss, stats_dict
