@@ -17,6 +17,11 @@ Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
    cd ldfmm
    pip install -r requirements.txt
    ```
+ - Compile external modules
+   ```
+   cd ldfmm
+   python setup.py develop
+   ```
 
 ## KITTI3D Dataset (41.5GB)
  - Download KITTI3D dataset: [calib](https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_calib.zip), [velodyne](https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_velodyne.zip), [label_2](https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_label_2.zip) and [image_2](https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_image_2.zip).

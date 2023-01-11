@@ -1,8 +1,9 @@
 import os
-import numpy as np
-from torch.utils.data import Dataset
-from skimage import io
 import cv2
+from skimage import io
+import numpy as np
+import torch
+from torch.utils.data import Dataset
 
 from data.kitti_object_eval_python.kitti_common import get_label_annos
 from data.kitti_object_eval_python.eval import get_official_eval_result
@@ -13,7 +14,10 @@ from utils.affine_utils import get_affine_mat
 from utils.affine_utils import affine_transform
 from utils.kitti_object3d_utils import parse_objects
 from utils.kitti_calibration_utils import parse_calib
+from utils.point_clouds_utils import get_points_in_fov
 from utils.point_clouds_utils import get_completed_lidar_projection_map
+from utils.box_utils import boxes3d_camera_to_lidar
+from ops.roiaware_pool3d.roiaware_pool3d_utils import points_in_boxes_cpu
 
 
 class KITTIDataset(Dataset):
@@ -92,11 +96,13 @@ class KITTIDataset(Dataset):
     def __getitem__(self, idx):
         img_id = int(self.id_list[idx])
         img = self.get_image(img_id)
-        pts = self.get_points(img_id)
         calib = self.get_calib(img_id)
 
+        pts = self.get_points(img_id)
+        pts_in_fov = get_points_in_fov(pts[:, :3], img, calib)
+
         # lidar_projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
-        lidar_projection_map = get_completed_lidar_projection_map(pts[:, :3], img, calib)
+        lidar_projection_map = get_completed_lidar_projection_map(pts_in_fov, img, calib)
 
         h, w, _ = img.shape
         img_size = np.array([w, h])
@@ -166,20 +172,39 @@ class KITTIDataset(Dataset):
             if obj.level_str == 'UnKnown': continue
             if obj.loc[-1] < self.min_distance or obj.loc[-1] > self.max_distance: continue
 
-            box2d = obj.box2d.copy()  # (u1, v1, u2, v2)
+            uvuv = obj.box2d.copy()  # (u1, v1, u2, v2)
             if random_flip_flag:
-                box2d[0], box2d[2] = img_size[0] - box2d[2], img_size[0] - box2d[0]
-            box2d[:2] = affine_transform(box2d[:2].reshape(-1, 2), affine_mat).squeeze()
-            box2d[2:] = affine_transform(box2d[2:].reshape(-1, 2), affine_mat).squeeze()
-            box2d /= self.downsample
-            center2d = np.array([(box2d[0] + box2d[2]) / 2, (box2d[1] + box2d[3]) / 2], dtype=np.float32)
-            size2d = np.array([box2d[2] - box2d[0], box2d[3] - box2d[1]], dtype=np.float32)
+                uvuv[0], uvuv[2] = img_size[0] - uvuv[2], img_size[0] - uvuv[0]
+            uvuv[:2] = affine_transform(uvuv[:2].reshape(-1, 2), affine_mat).squeeze()
+            uvuv[2:] = affine_transform(uvuv[2:].reshape(-1, 2), affine_mat).squeeze()
+            uvuv /= self.downsample
+
+            center2d = np.array([(uvuv[0] + uvuv[2]) / 2, (uvuv[1] + uvuv[3]) / 2], dtype=np.float32)
+            size2d = np.array([uvuv[2] - uvuv[0], uvuv[3] - uvuv[1]], dtype=np.float32)
             box2d = np.array([*center2d, *size2d], dtype=np.float32)
 
             center3d = obj.loc + [0, -obj.h / 2, 0]
             size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
             alpha = obj.alpha
             ry = obj.ry
+
+            point_indices = points_in_boxes_cpu(
+                torch.from_numpy(pts_in_fov),
+                torch.from_numpy(boxes3d_camera_to_lidar(np.array([*center3d, *size3d, ry]).reshape(-1, 7), calib)),
+            ).numpy()  # (nboxes, npoints)
+            selected_pts = pts_in_fov[point_indices[0] > 0]
+            if selected_pts.shape[0] == 0: continue
+
+            selected_pts_img, _ = calib.lidar_to_img(selected_pts)
+            mean_u, mean_v = selected_pts_img[:, 0].mean(), selected_pts_img[:, 1].mean()
+            keypoint = np.array([mean_u, mean_v], dtype=np.int64)
+            if random_flip_flag:
+                keypoint[0] = img_size[0] - keypoint[0]
+            keypoint = affine_transform(keypoint.reshape(-1, 2), affine_mat).squeeze()
+            keypoint /= self.downsample
+            if keypoint[0] < 0 or keypoint[0] >= feature_size[0]: continue
+            if keypoint[1] < 0 or keypoint[1] >= feature_size[1]: continue
+
             center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
             center3d_img = center3d_img.squeeze()
             if random_flip_flag:
@@ -187,14 +212,11 @@ class KITTIDataset(Dataset):
                 center3d[0] *= -1
                 alpha = np.pi - alpha
                 ry = np.pi - ry
-            box3d = np.array([*center3d, *size3d, ry], dtype=np.float32)
-            alpha_bin, alpha_res = angle_to_bin(alpha)
             center3d_img = affine_transform(center3d_img.reshape(-1, 2), affine_mat).squeeze()
             center3d_img /= self.downsample
+            box3d = np.array([*center3d, *size3d, ry], dtype=np.float32)
+            alpha_bin, alpha_res = angle_to_bin(alpha)
 
-            keypoint = center3d_img.astype(np.int64)
-            if keypoint[0] < 0 or keypoint[0] >= feature_size[0]: continue
-            if keypoint[1] < 0 or keypoint[1] >= feature_size[1]: continue
             radius = gaussian_radius(size2d)
             radius = max(0, int(radius))
             cls_id = self.cls_to_id[obj.cls_type]

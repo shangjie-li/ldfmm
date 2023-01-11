@@ -1,8 +1,11 @@
 .idea
 **__pycache__**
+**build**
+**egg-info**
 data/kitti/training
 data/kitti/testing
 *.pyc
+*.so
 outputs
 checkpoints
 logs
