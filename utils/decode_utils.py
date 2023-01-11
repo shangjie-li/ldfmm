@@ -86,15 +86,17 @@ def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
                 size2d = preds['size2d'][i, j, :] * downsample
                 u1, v1 = center2d - size2d / 2
                 u2, v2 = center2d + size2d / 2
-                box2d = [u1, v1, u2, v2]
             else:
                 box3d = np.array([*center3d, *size3d, ry], dtype=np.float32)
                 box3d_lidar = boxes3d_camera_to_lidar(box3d.reshape(-1, 7), calib).squeeze()
                 corners3d = box3d_lidar_to_corners3d(box3d_lidar)  # [8, 3]
                 corners_img, _ = calib.lidar_to_img(corners3d)
-                u1, v1 = max(0, corners_img[:, 0].min()), max(0, corners_img[:, 1].min())
-                u2, v2 = min(img_size[0], corners_img[:, 0].max()), min(img_size[1], corners_img[:, 1].max())
-                box2d = [u1, v1, u2, v2]
+                u1, v1 = corners_img[:, 0].min(), corners_img[:, 1].min()
+                u2, v2 = corners_img[:, 0].max(), corners_img[:, 1].max()
+
+            u1, v1 = max(0, u1), max(0, v1)
+            u2, v2 = min(img_size[0] - 1, u2), min(img_size[1] - 1, v2)
+            box2d = [u1, v1, u2, v2]
 
             det_per_img.append([int(cls_id), alpha, *box2d, *size3d, *loc, ry, score])
         det[img_id] = det_per_img

@@ -135,6 +135,9 @@ def draw_boxes2d(img, boxes2d, names=None, color=(0, 255, 0), thickness=2, show_
         u1, v1 = int(cu - width / 2), int(cv - height / 2)
         u2, v2 = int(cu + width / 2), int(cv + height / 2)
 
+        u1, v1 = max(0, u1), max(0, v1)
+        u2, v2 = min(img.shape[1] - 1, u2), min(img.shape[0] - 1, v2)
+
         if names is not None:
             color = box_colormap[names[i]]
 
