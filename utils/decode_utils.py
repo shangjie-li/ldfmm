@@ -64,13 +64,16 @@ def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
             cls_id = preds['cls_id'][i, j, 0]
             score = preds['score'][i, j, 0]
             center3d_img = preds['center3d_img'][i, j, :]
-            depth = preds['depth'][i, j, 0]
+            depth_ref = preds['depth_ref'][i, j, 0]
+            depth_res = preds['depth_res'][i, j, 0]
             size3d = preds['size3d'][i, j, :]
             alpha_bin = preds['alpha_bin'][i, j, :]
             alpha_res = preds['alpha_res'][i, j, :]
 
-            if score < score_thresh:
-                continue
+            if score < score_thresh: continue
+            if depth_ref == 0.0: continue
+
+            depth = depth_ref + depth_res
 
             x_img, y_img = center3d_img * downsample
             center3d = calib.img_to_rect(x_img, y_img, depth).reshape(-1)

@@ -32,6 +32,8 @@ class KITTIDataset(Dataset):
         self.resolution = np.array([1280, 384])
         self.max_objs = 50
         self.write_list = cfg['write_list']
+        self.keypoint_encoding = cfg['keypoint_encoding']
+        self.depth_diff_thresh = 3.0
 
         assert self.split in ['train', 'val', 'trainval', 'test']
         self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
@@ -168,7 +170,7 @@ class KITTIDataset(Dataset):
         num_objs = len(objects) if len(objects) <= self.max_objs else self.max_objs
         for i in range(num_objs):
             obj = objects[i]
-            if obj.cls_type not in self.write_list: continue
+            if obj.cls_type not in self.class_names: continue
             if obj.level_str == 'UnKnown': continue
             if obj.loc[-1] < self.min_distance or obj.loc[-1] > self.max_distance: continue
 
@@ -195,15 +197,26 @@ class KITTIDataset(Dataset):
             selected_pts = pts_in_fov[point_indices[0] > 0]
             if selected_pts.shape[0] == 0: continue
 
-            selected_pts_img, _ = calib.lidar_to_img(selected_pts)
-            mean_u, mean_v = selected_pts_img[:, 0].mean(), selected_pts_img[:, 1].mean()
-            keypoint = np.array([mean_u, mean_v], dtype=np.int64)
+            if self.keypoint_encoding == 'LidarPoints':
+                selected_pts_img, _ = calib.lidar_to_img(selected_pts)
+                mean_u, mean_v = selected_pts_img[:, 0].mean(), selected_pts_img[:, 1].mean()
+                keypoint = np.array([mean_u, mean_v], dtype=np.int64)
+            elif self.keypoint_encoding == 'Center3D':
+                center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
+                center3d_img = center3d_img.squeeze()
+                keypoint = np.array([center3d_img[0], center3d_img[1]], dtype=np.int64)
+            else:
+                raise NotImplementedError
             if random_flip_flag:
                 keypoint[0] = img_size[0] - keypoint[0]
             keypoint = affine_transform(keypoint.reshape(-1, 2), affine_mat).squeeze()
             keypoint /= self.downsample
             if keypoint[0] < 0 or keypoint[0] >= feature_size[0]: continue
             if keypoint[1] < 0 or keypoint[1] >= feature_size[1]: continue
+
+            depth = center3d[-1]
+            ref_depth = lidar_projection_map[-1, int(keypoint[1]), int(keypoint[0])]
+            if abs(depth - ref_depth) > self.depth_diff_thresh: continue
 
             center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
             center3d_img = center3d_img.squeeze()

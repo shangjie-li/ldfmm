@@ -42,7 +42,7 @@ class LDFMM(nn.Module):
         self.heads = {
             'heatmap': num_classes,
             'offset3d': 2,
-            'depth': 1,
+            'depth_res': 1,
             'size3d': 3,
             'alpha_bin': 12,
             'alpha_res': 12,
@@ -94,9 +94,8 @@ class LDFMM(nn.Module):
         offsets3d = get_poi(outputs['offset3d'], indices)
         centers3d_img = torch.stack([xs, ys], dim=2) + offsets3d
 
-        lidar_maps = get_poi(lidar_maps, indices)
-        depths = get_poi(outputs['depth'], indices)
-        depths += lidar_maps[:, :, 2:3]
+        depths_ref = get_poi(lidar_maps, indices)[:, :, 2:3]
+        depths_res = get_poi(outputs['depth_res'], indices)
 
         sizes3d = get_poi(outputs['size3d'], indices)
 
@@ -107,7 +106,8 @@ class LDFMM(nn.Module):
             'cls_id': cls_ids.view(batch_size, K, 1),
             'score': scores.view(batch_size, K, 1),
             'center3d_img': centers3d_img.view(batch_size, K, 2),
-            'depth': depths.view(batch_size, K, 1),
+            'depth_ref': depths_ref.view(batch_size, K, 1),
+            'depth_res': depths_res.view(batch_size, K, 1),
             'size3d': sizes3d.view(batch_size, K, 3),
             'alpha_bin': alphas_bin.view(batch_size, K, 12),
             'alpha_res': alphas_res.view(batch_size, K, 12),
@@ -143,9 +143,9 @@ class LDFMM(nn.Module):
         gt_offsets3d = targets['offset3d'][mask].view(-1, 2)
         offset3d_loss = F.l1_loss(offsets3d, gt_offsets3d)
 
-        lidar_maps = get_poi(lidar_maps, gt_keypoints)[mask].view(-1, 3)
-        depths = get_poi(outputs['depth'], gt_keypoints)[mask].view(-1, 1)
-        depths += lidar_maps[:, 2:3]
+        depths_ref = get_poi(lidar_maps, gt_keypoints)[mask].view(-1, 3)[:, 2:3]
+        depths_res = get_poi(outputs['depth_res'], gt_keypoints)[mask].view(-1, 1)
+        depths = depths_ref + depths_res
         gt_depths = targets['box3d'][:, :, 2:3][mask].view(-1, 1)
         depth_loss = F.l1_loss(depths, gt_depths)
 

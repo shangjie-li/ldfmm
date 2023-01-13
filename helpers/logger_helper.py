@@ -17,16 +17,16 @@ def create_logger(log_file):
 def log_cfg(args, cfg, logger):
     logger.info('Arguments:')
     for key, val in vars(args).items():
-        logger.info('  {:18} {}'.format(key, val))
+        logger.info('  {:20} {}'.format(key, val))
 
     logger.info('Configuration:')
     for key, val in cfg.items():
         if not isinstance(val, dict):
-            logger.info('  {:18} {}'.format(key, val))
+            logger.info('  {:20} {}'.format(key, val))
         else:
             logger.info('  {}'.format(key))
             for sub_key, sub_val in val.items():
-                logger.info('    {:16} {}'.format(sub_key, sub_val))
+                logger.info('    {:18} {}'.format(sub_key, sub_val))
 
 
 def set_random_seed(seed):
