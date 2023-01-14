@@ -24,6 +24,8 @@ def parse_config():
                         help='path to the config file')
     parser.add_argument('--result_dir', type=str, default='outputs/data',
                         help='path to save detection results')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='path to the checkpoint for evaluating')
     args = parser.parse_args()
     return args
 
@@ -32,6 +34,9 @@ def main():
     args = parse_config()
     assert os.path.exists(args.cfg_file)
     cfg = yaml.load(open(args.cfg_file, 'r'), Loader=yaml.Loader)
+
+    if args.checkpoint is not None:
+        cfg['tester']['checkpoint'] = args.checkpoint
 
     log_dir = 'logs'
     os.makedirs(log_dir, exist_ok=True)
