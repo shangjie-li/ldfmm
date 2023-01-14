@@ -54,11 +54,11 @@ Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
 ## Demo
  - Run the demo with a trained model
    ```
-   # Run on the testing dataset
+   # Show detections in the image
    python demo.py --checkpoint=checkpoints/checkpoint_epoch_80.pth --show_boxes3d
    
-   # Run on a single sample from the testing dataset
-   python demo.py --checkpoint=checkpoints/checkpoint_epoch_80.pth --show_boxes3d --sample_idx=000008
+   # Show detections in point clouds
+   python demo.py --checkpoint=checkpoints/checkpoint_epoch_80.pth --show_boxes3d --show_lidar_points
    ```
 
 ## Training
