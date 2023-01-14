@@ -55,10 +55,10 @@ Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
  - Run the demo with a trained model
    ```
    # Run on the testing dataset
-   python demo.py --ckpt=path_to_your_ckpt
+   python demo.py --checkpoint=checkpoints/checkpoint_epoch_80.pth --show_boxes3d
    
    # Run on a single sample from the testing dataset
-   python demo.py --ckpt=path_to_your_ckpt --sample_idx=000008
+   python demo.py --checkpoint=checkpoints/checkpoint_epoch_80.pth --show_boxes3d --sample_idx=000008
    ```
 
 ## Training

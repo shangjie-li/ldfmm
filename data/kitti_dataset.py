@@ -200,11 +200,12 @@ class KITTIDataset(Dataset):
             if self.keypoint_encoding == 'LidarPoints':
                 selected_pts_img, _ = calib.lidar_to_img(selected_pts)
                 mean_u, mean_v = selected_pts_img[:, 0].mean(), selected_pts_img[:, 1].mean()
-                keypoint = np.array([mean_u, mean_v], dtype=np.int64)
+                dis = np.sqrt((selected_pts_img[:, 0] - mean_u) ** 2 + (selected_pts_img[:, 1] - mean_v) ** 2)
+                keypoint = selected_pts_img[np.argmin(dis)].astype(np.int64)
             elif self.keypoint_encoding == 'Center3D':
                 center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
                 center3d_img = center3d_img.squeeze()
-                keypoint = np.array([center3d_img[0], center3d_img[1]], dtype=np.int64)
+                keypoint = center3d_img.astype(np.int64)
             else:
                 raise NotImplementedError
             if random_flip_flag:

@@ -25,7 +25,7 @@ class Tester(object):
             model=self.model,
             optimizer=None,
             map_location=self.device,
-            logger=self.logger
+            logger=self.logger,
         )
 
         torch.set_grad_enabled(False)
@@ -35,7 +35,7 @@ class Tester(object):
             total=len(self.dataloader), dynamic_ncols=True, leave=True, desc='batches'
         )
 
-        for batch_idx, (inputs, targets, infos, lidar_maps) in enumerate(self.dataloader):
+        for batch_idx, (inputs, _, infos, lidar_maps) in enumerate(self.dataloader):
             inputs = inputs.to(self.device)
             lidar_maps = lidar_maps.to(self.device)
 

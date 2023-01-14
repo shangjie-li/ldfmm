@@ -69,11 +69,10 @@ class Trainer(object):
             desc='iters'
         )
 
-        for batch_idx, (inputs, targets, infos, lidar_maps) in enumerate(self.train_loader):
+        for batch_idx, (inputs, targets, _, lidar_maps) in enumerate(self.train_loader):
             inputs = inputs.to(self.device)
+            targets = {key: val.to(self.device) for key, val in targets.items()}
             lidar_maps = lidar_maps.to(self.device)
-            for key in targets.keys():
-                targets[key] = targets[key].to(self.device)
 
             self.optimizer.zero_grad()
 
