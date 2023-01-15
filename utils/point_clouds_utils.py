@@ -9,7 +9,7 @@ def get_points_in_fov(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         points_in_fov: ndarray of float32, [N', 3], points of (x, y, z) in fov
@@ -34,7 +34,7 @@ def get_point_colors(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         points_in_fov: ndarray of float32, [N', 3], points of (x, y, z) in fov
@@ -55,7 +55,7 @@ def get_depth_map(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         depth_map: ndarray of float32, [H, W], z values in camera coordinates
@@ -77,7 +77,7 @@ def get_completed_depth_map(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         depth_map: ndarray of float32, [H, W], z values in camera coordinates
@@ -93,7 +93,7 @@ def compute_projection_map_from_depth_map(depth_map, calib):
 
     Args:
         depth_map: ndarray of float32, [H, W], z values in camera coordinates
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
@@ -113,7 +113,7 @@ def get_lidar_projection_map(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
@@ -129,7 +129,7 @@ def get_completed_lidar_projection_map(points, image, calib):
     Args:
         points: ndarray of float32, [N, 3], points of (x, y, z)
         image: ndarray of uint8, [H, W, 3], RGB image
-        calib: calibration_kitti.Calibration
+        calib: kitti_calibration_utils.Calibration
 
     Returns:
         projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
