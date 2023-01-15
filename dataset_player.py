@@ -43,7 +43,7 @@ def parse_config():
 
 
 def visualize(dataset, args, img, lpm, pts, img_id,
-              heatmap=None, keypoints=None, boxes2d=None, boxes3d=None, names=None, flip_flag=None, info=None):
+              heatmap=None, keypoints=None, boxes2d=None, boxes3d=None, names=None, info=None):
     calib = dataset.get_calib(img_id)
 
     img = opencv_vis_utils.normalize_img(img)
@@ -85,7 +85,6 @@ def visualize(dataset, args, img, lpm, pts, img_id,
                 boxes2d=boxes2d if boxes2d is not None and args.show_boxes2d else None,
                 boxes3d_camera=boxes3d if boxes3d is not None and args.show_boxes3d else None,
                 names=names,
-                flip_flag=flip_flag,
                 info=info,
                 window_name=key,
                 wait_key=False,
@@ -109,7 +108,6 @@ def run(dataset, args, img, target, info, lidar_projection_map):
     keypoints = target['keypoint'][mask]  # (u, v) of keypoints
     boxes2d = target['box2d'][mask]  # (cu, cv, width, height) of bounding boxes
     boxes3d = target['box3d'][mask]  # (x, y, z, h, w, l, ry) in camera coordinates
-    flip_flag = target['flip_flag'][mask]
     cls_ids = target['cls_id'][mask]
     names = [dataset.class_names[idx] for idx in cls_ids]
 
@@ -121,8 +119,7 @@ def run(dataset, args, img, target, info, lidar_projection_map):
 
     visualize(
         dataset, args, img, lpm, pts, img_id,
-        heatmap=heatmap, keypoints=keypoints, boxes2d=boxes2d, boxes3d=boxes3d, names=names,
-        flip_flag=flip_flag, info=info,
+        heatmap=heatmap, keypoints=keypoints, boxes2d=boxes2d, boxes3d=boxes3d, names=names, info=info,
     )
 
 

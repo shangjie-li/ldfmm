@@ -39,7 +39,7 @@ def normalize_img(img):
 
 
 def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, names=None,
-               flip_flag=None, info=None, window_name='image', wait_key=True, enter_to_save=True):
+               info=None, window_name='image', wait_key=True, enter_to_save=True):
     """
     Show the image with 2D boxes or 3D boxes.
 
@@ -50,7 +50,6 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, na
         boxes2d: ndarray of float32, [N, 4], (cu, cv, width, height) of bounding boxes
         boxes3d_camera: ndarray of float32, [N, 7], (x, y, z, h, w, l, ry] in camera coordinates
         names: list of str, name of each object
-        flip_flag: ndarray of uint8, [N]
         info: dict
         window_name: str
         wait_key: bool
@@ -66,7 +65,7 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, na
         img = draw_boxes2d(img, boxes2d, names)
 
     if boxes3d_camera is not None:
-        img = draw_boxes3d(img, calib, boxes3d_camera, names, flip_flag, info)
+        img = draw_boxes3d(img, calib, boxes3d_camera, names, info)
 
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, img.shape[1], img.shape[0])
@@ -95,6 +94,7 @@ def draw_keypoints(img, keypoints, names=None, radius=1, color=(0, 255, 0), thic
         img: ndarray of uint8, [H, W, 3], BGR image
         keypoints: ndarray of float32, [N, 2], (u, v) of keypoints
         names: list of str, name of each object
+        radius: int
         color: tuple
         thickness: int
 
@@ -152,8 +152,7 @@ def draw_boxes2d(img, boxes2d, names=None, color=(0, 255, 0), thickness=2, show_
     return img
 
 
-def draw_boxes3d(img, calib, boxes3d_camera, names=None, flip_flag=None, info=None,
-                 color=(0, 255, 0), thickness=2):
+def draw_boxes3d(img, calib, boxes3d_camera, names=None, info=None, color=(0, 255, 0), thickness=2):
     """
     Draw 3D boxes in the image.
 
@@ -162,7 +161,6 @@ def draw_boxes3d(img, calib, boxes3d_camera, names=None, flip_flag=None, info=No
         calib: kitti_calibration_utils.Calibration
         boxes3d_camera: ndarray of float32, [N, 7], (x, y, z, h, w, l, ry] in camera coordinates
         names: list of str, name of each object
-        flip_flag: ndarray of uint8, [N]
         info: dict
         color: tuple
         thickness: int
@@ -173,14 +171,14 @@ def draw_boxes3d(img, calib, boxes3d_camera, names=None, flip_flag=None, info=No
     """
     for i in range(boxes3d_camera.shape[0]):
         box3d_camera = boxes3d_camera[i].copy()
-        if flip_flag is not None:
-            if flip_flag[i]:
+        if info is not None:
+            if info['flip_flag']:
                 box3d_camera[0] *= -1
                 box3d_camera[-1] = np.pi - box3d_camera[-1]
             box3d_lidar = boxes3d_camera_to_lidar(box3d_camera.reshape(-1, 7), calib).squeeze()
             corners3d = box3d_lidar_to_corners3d(box3d_lidar)  # [8, 3]
             corners_img, corners_img_depth = calib.lidar_to_img(corners3d)
-            if flip_flag[i]:
+            if info['flip_flag']:
                 corners_img[:, 0] = info['img_size'][0] - corners_img[:, 0]
             corners_img = affine_transform(corners_img, info['affine_mat'])
         else:

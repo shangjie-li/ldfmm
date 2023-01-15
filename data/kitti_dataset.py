@@ -144,6 +144,8 @@ class KITTIDataset(Dataset):
             'img_size': img_size,
             'original_downsample': img_size / feature_size,
             'affine_mat': affine_mat,
+            'flip_flag': random_flip_flag,
+            'crop_flag': random_crop_flag,
         }
 
         if self.split == 'test':
@@ -159,8 +161,6 @@ class KITTIDataset(Dataset):
             'box3d': np.zeros((self.max_objs, 7), dtype=np.float32),  # (x, y, z, h, w, l, ry)
             'alpha_bin': np.zeros((self.max_objs, 1), dtype=np.int64),
             'alpha_res': np.zeros((self.max_objs, 1), dtype=np.float32),
-            'flip_flag': np.zeros((self.max_objs,), dtype=np.uint8),
-            'crop_flag': np.zeros((self.max_objs,), dtype=np.uint8),
             'cls_id': np.zeros((self.max_objs,), dtype=np.int64) - 1,
             'mask': np.zeros((self.max_objs,), dtype=np.int64),
         }
@@ -239,8 +239,6 @@ class KITTIDataset(Dataset):
             target['box3d'][i] = box3d
             target['alpha_bin'][i] = alpha_bin
             target['alpha_res'][i] = alpha_res
-            target['flip_flag'][i] = random_flip_flag
-            target['crop_flag'][i] = random_crop_flag
             target['cls_id'][i] = cls_id
             target['mask'][i] = 1
 
