@@ -72,7 +72,7 @@ def visualize(dataset, args, img, lpm, pts, img_id,
                 wait_key=False,
             )
         cv2.moveWindow(img_window_name, 0, 0)
-        cv2.moveWindow(lpm_window_name, 0, 400)
+        cv2.moveWindow(lpm_window_name, 0, 450)
         cv2.waitKey()
         cv2.destroyAllWindows()
     else:
@@ -91,7 +91,7 @@ def visualize(dataset, args, img, lpm, pts, img_id,
                 wait_key=False,
             )
         cv2.moveWindow(img_window_name, 0, 0)
-        cv2.moveWindow(lpm_window_name, 0, 400)
+        cv2.moveWindow(lpm_window_name, 0, 450)
         cv2.waitKey()
         cv2.destroyAllWindows()
 

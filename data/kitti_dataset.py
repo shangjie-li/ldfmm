@@ -48,8 +48,6 @@ class KITTIDataset(Dataset):
         self.augment_data = augment_data
         if self.split not in ['train', 'trainval']:
             self.augment_data = False
-        self.min_distance = cfg['min_distance']
-        self.max_distance = cfg['max_distance']
         self.random_flip = cfg['random_flip']
         self.random_crop = cfg['random_crop']
         self.scale = cfg['scale']
@@ -171,8 +169,6 @@ class KITTIDataset(Dataset):
         for i in range(num_objs):
             obj = objects[i]
             if obj.cls_type not in self.class_names: continue
-            if obj.level_str == 'UnKnown': continue
-            if obj.loc[-1] < self.min_distance or obj.loc[-1] > self.max_distance: continue
 
             uvuv = obj.box2d.copy()  # (u1, v1, u2, v2)
             if random_flip_flag:
