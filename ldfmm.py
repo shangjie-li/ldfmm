@@ -87,6 +87,7 @@ class LDFMM(nn.Module):
         heatmaps = outputs['heatmap']
         batch_size = heatmaps.shape[0]
         heatmaps = torch.clamp(heatmaps.sigmoid_(), min=1e-4, max=1 - 1e-4)
+        heatmaps *= lidar_maps[:, 2:3, :, :] > 0
         heatmaps = nms_heatmap(heatmaps)
 
         scores, indices, cls_ids, xs, ys = select_topk(heatmaps, K=K)
