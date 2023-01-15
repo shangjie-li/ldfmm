@@ -1,7 +1,9 @@
 import numpy as np
+import torch
 
 from utils.box_utils import boxes3d_camera_to_lidar
 from utils.box_utils import box3d_lidar_to_corners3d
+from ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 
 
 def normalize_angle(angle):
@@ -36,6 +38,33 @@ def bin_to_angle(bin_id, residual_angle):
     angle = angle_center + residual_angle
 
     return normalize_angle(angle)
+
+
+def nms(objects, calib, nms_thresh=0.1):
+    """
+
+    Args:
+        objects: list
+        calib: kitti_calibration_utils.Calibration
+        nms_thresh: float
+
+    Returns:
+        selected: list
+
+    """
+    objects = np.array(objects).astype(np.float32).reshape(-1, 14)
+    scores = objects[:, -1]
+    sizes3d, center3d, rys = objects[:, 6:9], objects[:, 9:12], objects[:, 12:13]
+    center3d[:, 1] += -sizes3d[:, 0] / 2
+    boxes3d = np.concatenate([center3d, sizes3d, rys], axis=-1)
+    boxes3d_lidar = boxes3d_camera_to_lidar(boxes3d, calib)
+
+    selected = []
+    if scores.shape[0] > 0:
+        selected, _ = nms_gpu(torch.from_numpy(boxes3d_lidar).cuda(), torch.from_numpy(scores).cuda(), nms_thresh)
+        selected = selected.tolist()
+
+    return selected
 
 
 def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
@@ -102,6 +131,8 @@ def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
             box2d = [u1, v1, u2, v2]
 
             det_per_img.append([int(cls_id), alpha, *box2d, *size3d, *loc, ry, score])
-        det[img_id] = det_per_img
+
+        selected_indices = nms(det_per_img, calib)
+        det[img_id] = [obj for idx, obj in enumerate(det_per_img) if idx in selected_indices]
 
     return det
