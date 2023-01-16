@@ -14,7 +14,6 @@ from utils.affine_utils import get_affine_mat
 from utils.affine_utils import affine_transform
 from utils.kitti_object3d_utils import parse_objects
 from utils.kitti_calibration_utils import parse_calib
-from utils.point_clouds_utils import get_points_in_fov
 from utils.point_clouds_utils import get_completed_lidar_projection_map
 from utils.box_utils import boxes3d_camera_to_lidar
 from ops.roiaware_pool3d.roiaware_pool3d_utils import points_in_boxes_cpu
@@ -29,11 +28,10 @@ class KITTIDataset(Dataset):
         self.cls_to_id = {}
         for i, name in enumerate(self.class_names):
             self.cls_to_id[name] = i
-        self.resolution = np.array([1280, 384])
-        self.max_objs = 50
         self.write_list = cfg['write_list']
         self.keypoint_encoding = cfg['keypoint_encoding']
         self.depth_diff_thresh = 3.0
+        self.max_objs = 50
 
         assert self.split in ['train', 'val', 'trainval', 'test']
         self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
@@ -54,7 +52,10 @@ class KITTIDataset(Dataset):
         self.shift = cfg['shift']
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+        self.resolution = np.array([1280, 384])
         self.downsample = 4
+        self.feature_size = self.resolution // self.downsample
 
     def get_image(self, idx):
         img_file = os.path.join(self.image_dir, '%06d.png' % idx)
@@ -96,29 +97,24 @@ class KITTIDataset(Dataset):
     def __getitem__(self, idx):
         img_id = int(self.id_list[idx])
         img = self.get_image(img_id)
+        pts = self.get_points(img_id)
         calib = self.get_calib(img_id)
 
-        pts = self.get_points(img_id)
-        pts_in_fov = get_points_in_fov(pts[:, :3], img, calib)
-
         # lidar_projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
-        lidar_projection_map = get_completed_lidar_projection_map(pts_in_fov, img, calib)
+        lpm = get_completed_lidar_projection_map(pts[:, :3], img, calib)
+        lpm_original = lpm.copy()
 
         h, w, _ = img.shape
         img_size = np.array([w, h])
-        feature_size = self.resolution // self.downsample  # W and H
-
         center = img_size / 2
         aug_size = img_size
         random_flip_flag, random_crop_flag = False, False
-
         if self.augment_data:
             if np.random.random() < self.random_flip:
                 random_flip_flag = True
                 img = img[:, ::-1, :]
-                lidar_projection_map = lidar_projection_map[:, ::-1, :]
-                lidar_projection_map[:, :, 0] *= -1
-
+                lpm = lpm[:, ::-1, :]
+                lpm[:, :, 0] *= -1
             if np.random.random() < self.random_crop:
                 random_crop_flag = True
                 aug_scale = np.clip(np.random.randn() * self.scale + 1, 1 - self.scale, 1 + self.scale)
@@ -128,32 +124,30 @@ class KITTIDataset(Dataset):
 
         # affine_mat: ndarray of float, [2, 3]
         affine_mat = get_affine_mat(center, aug_size, self.resolution)
-        img = cv2.warpAffine(
-            img, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
-        lidar_projection_map = cv2.warpAffine(
-            lidar_projection_map, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
 
-        img = img.astype(np.float32) / 255.0
-        img = (img - self.mean) / self.std
+        img = cv2.warpAffine(img, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
+        img = (img.astype(np.float32) / 255.0 - self.mean) / self.std
         img = img.transpose(2, 0, 1)  # [C, H, W]
-        lidar_projection_map = cv2.resize(lidar_projection_map, feature_size, interpolation=cv2.INTER_NEAREST)
-        lidar_projection_map = lidar_projection_map.transpose(2, 0, 1)  # [C, H, W]
+
+        lpm = cv2.warpAffine(lpm, M=affine_mat, dsize=self.resolution, flags=cv2.INTER_NEAREST)
+        lpm = cv2.resize(lpm, self.feature_size, interpolation=cv2.INTER_NEAREST)
+        lpm = lpm.transpose(2, 0, 1)  # [C, H, W]
 
         info = {
             'img_id': img_id,
             'img_size': img_size,
-            'original_downsample': img_size / feature_size,
+            'original_downsample': img_size / self.feature_size,
             'affine_mat': affine_mat,
             'flip_flag': random_flip_flag,
             'crop_flag': random_crop_flag,
         }
 
         if self.split == 'test':
-            return img, None, info, lidar_projection_map
+            return img, None, info, lpm
 
         objects = self.get_label(img_id)
         target = {
-            'heatmap': np.zeros((self.num_classes, feature_size[1], feature_size[0]), dtype=np.float32),
+            'heatmap': np.zeros((self.num_classes, self.feature_size[1], self.feature_size[0]), dtype=np.float32),
             'keypoint': np.zeros((self.max_objs, 2), dtype=np.int64),  # (u, v)
             'offset2d': np.zeros((self.max_objs, 2), dtype=np.float32),  # (du, dv)
             'box2d': np.zeros((self.max_objs, 4), dtype=np.float32),  # (cu, cv, width, height)
@@ -170,62 +164,29 @@ class KITTIDataset(Dataset):
             obj = objects[i]
             if obj.cls_type not in self.class_names: continue
 
-            uvuv = obj.box2d.copy()  # (u1, v1, u2, v2)
-            if random_flip_flag:
-                uvuv[0], uvuv[2] = img_size[0] - uvuv[2], img_size[0] - uvuv[0]
-            uvuv[:2] = affine_transform(uvuv[:2].reshape(-1, 2), affine_mat).squeeze()
-            uvuv[2:] = affine_transform(uvuv[2:].reshape(-1, 2), affine_mat).squeeze()
-            uvuv /= self.downsample
+            box2d = self.obtain_box2d(obj, info)
+            center2d, size2d = box2d[0:2], box2d[2:4]
 
-            center2d = np.array([(uvuv[0] + uvuv[2]) / 2, (uvuv[1] + uvuv[3]) / 2], dtype=np.float32)
-            size2d = np.array([uvuv[2] - uvuv[0], uvuv[3] - uvuv[1]], dtype=np.float32)
-            box2d = np.array([*center2d, *size2d], dtype=np.float32)
-
-            center3d = obj.loc + [0, -obj.h / 2, 0]
-            size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
-            alpha = obj.alpha
-            ry = obj.ry
-
-            point_indices = points_in_boxes_cpu(
-                torch.from_numpy(pts_in_fov),
-                torch.from_numpy(boxes3d_camera_to_lidar(np.array([*center3d, *size3d, ry]).reshape(-1, 7), calib)),
-            ).numpy()  # (nboxes, npoints)
-            selected_pts = pts_in_fov[point_indices[0] > 0]
-            if selected_pts.shape[0] == 0: continue
+            pts_lidar_in_box3d = self.obtain_pts_lidar_in_box3d(obj, info, calib, lpm_original)
+            if pts_lidar_in_box3d.shape[0] == 0: continue
 
             if self.keypoint_encoding == 'LidarPoints':
-                selected_pts_img, _ = calib.lidar_to_img(selected_pts)
-                mean_u, mean_v = selected_pts_img[:, 0].mean(), selected_pts_img[:, 1].mean()
-                dis = np.sqrt((selected_pts_img[:, 0] - mean_u) ** 2 + (selected_pts_img[:, 1] - mean_v) ** 2)
-                keypoint = selected_pts_img[np.argmin(dis)].astype(np.int64)
+                keypoint = self.obtain_keypoint_by_lidar_points(obj, info, calib, pts_lidar_in_box3d, lpm)
             elif self.keypoint_encoding == 'Center3D':
-                center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
-                center3d_img = center3d_img.squeeze()
-                keypoint = center3d_img.astype(np.int64)
+                keypoint = self.obtain_center3d_img(obj, info, calib)
             else:
                 raise NotImplementedError
-            if random_flip_flag:
-                keypoint[0] = img_size[0] - keypoint[0]
-            keypoint = affine_transform(keypoint.reshape(-1, 2), affine_mat).squeeze()
-            keypoint /= self.downsample
-            if keypoint[0] < 0 or keypoint[0] >= feature_size[0]: continue
-            if keypoint[1] < 0 or keypoint[1] >= feature_size[1]: continue
 
-            depth = center3d[-1]
-            ref_depth = lidar_projection_map[-1, int(keypoint[1]), int(keypoint[0])]
-            if abs(depth - ref_depth) > self.depth_diff_thresh: continue
+            if keypoint[0] < 0 or keypoint[0] >= self.feature_size[0]: continue
+            if keypoint[1] < 0 or keypoint[1] >= self.feature_size[1]: continue
 
-            center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
-            center3d_img = center3d_img.squeeze()
-            if random_flip_flag:
-                center3d_img[0] = img_size[0] - center3d_img[0]
-                center3d[0] *= -1
-                alpha = np.pi - alpha
-                ry = np.pi - ry
-            center3d_img = affine_transform(center3d_img.reshape(-1, 2), affine_mat).squeeze()
-            center3d_img /= self.downsample
-            box3d = np.array([*center3d, *size3d, ry], dtype=np.float32)
+            box3d = self.obtain_box3d(obj, info)
+            center3d_img = self.obtain_center3d_img(obj, info, calib)
+            alpha = self.obtain_alpha(obj, info)
             alpha_bin, alpha_res = angle_to_bin(alpha)
+
+            depth = box3d[2]
+            if abs(depth - lpm[-1, keypoint[1], keypoint[0]]) > self.depth_diff_thresh: continue
 
             radius = gaussian_radius(size2d)
             radius = max(0, int(radius))
@@ -246,4 +207,87 @@ class KITTIDataset(Dataset):
             new_idx = np.random.randint(self.__len__())
             return self.__getitem__(new_idx)
 
-        return img, target, info, lidar_projection_map
+        return img, target, info, lpm
+
+    def obtain_box2d(self, obj, info):
+        uvuv = obj.box2d.copy()  # (u1, v1, u2, v2)
+        if info['flip_flag']:
+            uvuv[0], uvuv[2] = info['img_size'][0] - uvuv[2], info['img_size'][0] - uvuv[0]
+        uvuv[:2] = affine_transform(uvuv[:2].reshape(-1, 2), info['affine_mat']).squeeze()
+        uvuv[2:] = affine_transform(uvuv[2:].reshape(-1, 2), info['affine_mat']).squeeze()
+        uvuv /= self.downsample
+
+        center2d = np.array([(uvuv[0] + uvuv[2]) / 2, (uvuv[1] + uvuv[3]) / 2], dtype=np.float32)
+        size2d = np.array([uvuv[2] - uvuv[0], uvuv[3] - uvuv[1]], dtype=np.float32)
+
+        return np.array([*center2d, *size2d], dtype=np.float32)
+
+    def obtain_box3d(self, obj, info):
+        center3d = obj.loc + [0, -obj.h / 2, 0]
+        size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
+        ry = obj.ry
+        if info['flip_flag']:
+            center3d[0] *= -1
+            ry = np.pi - ry
+
+        return np.array([*center3d, *size3d, ry], dtype=np.float32)
+
+    def obtain_alpha(self, obj, info):
+        alpha = obj.alpha
+        if info['flip_flag']:
+            alpha = np.pi - alpha
+
+        return alpha
+
+    def obtain_pts_lidar_in_box3d(self, obj, info, calib, lpm_original):
+        lpm = lpm_original
+        if info['flip_flag']:
+            lpm = lpm[:, ::-1, :]
+        lpm = cv2.warpAffine(lpm, M=info['affine_mat'], dsize=self.resolution, flags=cv2.INTER_NEAREST)
+        lpm = cv2.resize(lpm, self.feature_size, interpolation=cv2.INTER_NEAREST)
+
+        center3d = obj.loc + [0, -obj.h / 2, 0]
+        size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
+        ry = obj.ry
+        pts_lidar = calib.rect_to_lidar(lpm.reshape(-1, 3))
+        boxes_lidar = boxes3d_camera_to_lidar(np.array([*center3d, *size3d, ry]).reshape(-1, 7), calib)
+        point_indices = points_in_boxes_cpu(
+            torch.from_numpy(pts_lidar),
+            torch.from_numpy(boxes_lidar),
+        ).numpy()  # (nboxes, npoints)
+
+        return pts_lidar[point_indices[0] > 0]
+
+    def obtain_keypoint_by_lidar_points(self, obj, info, calib, pts_lidar_in_box3d, lpm, max_iters=10):
+        pts_img, _ = calib.lidar_to_img(pts_lidar_in_box3d)
+        mean_u, mean_v = pts_img[:, 0].mean(), pts_img[:, 1].mean()
+        dis = np.sqrt((pts_img[:, 0] - mean_u) ** 2 + (pts_img[:, 1] - mean_v) ** 2)
+        indices = np.argsort(dis)
+        pts_img = pts_img[indices] if indices.shape[0] < max_iters else pts_img[indices[:max_iters]]
+        if info['flip_flag']:
+            pts_img[:, 0] = info['img_size'][0] - pts_img[:, 0]
+        pts_img = affine_transform(pts_img, info['affine_mat'])
+        pts_img /= self.downsample
+        pts_img = pts_img.astype(np.int64)
+
+        depth = obj.loc[-1]
+        keypoint = pts_img[0]
+        for i in range(pts_img.shape[0]):
+            keypoint = pts_img[i]
+            if keypoint[0] < 0 or keypoint[0] >= self.feature_size[0]: continue
+            if keypoint[1] < 0 or keypoint[1] >= self.feature_size[1]: continue
+            if abs(depth - lpm[-1, keypoint[1], keypoint[0]]) <= self.depth_diff_thresh: break
+
+        return keypoint
+
+    def obtain_center3d_img(self, obj, info, calib):
+        center3d = obj.loc + [0, -obj.h / 2, 0]
+        center3d_img, _ = calib.rect_to_img(center3d.reshape(-1, 3))
+        center3d_img = center3d_img.squeeze()
+        if info['flip_flag']:
+            center3d_img[0] = info['img_size'][0] - center3d_img[0]
+        center3d_img = affine_transform(center3d_img.reshape(-1, 2), info['affine_mat']).squeeze()
+        center3d_img /= self.downsample
+        center3d_img = center3d_img.astype(np.int64)
+
+        return center3d_img
