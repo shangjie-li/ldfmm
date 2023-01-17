@@ -28,7 +28,7 @@ def gaussian_radius(bbox_size, min_overlap=0.7):
         min_overlap: float
 
     Returns:
-        radius: float
+        radius: int
 
     """
     height, width = bbox_size
@@ -52,6 +52,7 @@ def gaussian_radius(bbox_size, min_overlap=0.7):
     r3 = (b3 + sq3) / 2
 
     radius = min(r1, r2, r3)
+    radius = max(0, int(radius))
 
     return radius
 

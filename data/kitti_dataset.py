@@ -102,7 +102,6 @@ class KITTIDataset(Dataset):
 
         # lidar_projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
         lpm = get_completed_lidar_projection_map(pts[:, :3], img, calib)
-        lpm_original = lpm.copy()
 
         h, w, _ = img.shape
         img_size = np.array([w, h])
@@ -164,14 +163,11 @@ class KITTIDataset(Dataset):
             obj = objects[i]
             if obj.cls_type not in self.class_names: continue
 
-            box2d = self.obtain_box2d(obj, info)
-            center2d, size2d = box2d[0:2], box2d[2:4]
-
-            pts_lidar_in_box3d = self.obtain_pts_lidar_in_box3d(obj, info, calib, lpm_original)
-            if pts_lidar_in_box3d.shape[0] == 0: continue
+            pts_img_in_box3d = self.obtain_pts_img_in_box3d(obj, info, calib, lpm)
+            if pts_img_in_box3d.shape[0] == 0: continue
 
             if self.keypoint_encoding == 'LidarPoints':
-                keypoint = self.obtain_keypoint_by_lidar_points(obj, info, calib, pts_lidar_in_box3d, lpm)
+                keypoint = self.obtain_keypoint_by_lidar_points(obj, pts_img_in_box3d, lpm)
             elif self.keypoint_encoding == 'Center3D':
                 keypoint = self.obtain_center3d_img(obj, info, calib)
             else:
@@ -179,6 +175,9 @@ class KITTIDataset(Dataset):
 
             if keypoint[0] < 0 or keypoint[0] >= self.feature_size[0]: continue
             if keypoint[1] < 0 or keypoint[1] >= self.feature_size[1]: continue
+
+            box2d = self.obtain_box2d(obj, info)
+            center2d, size2d = box2d[0:2], box2d[2:4]
 
             box3d = self.obtain_box3d(obj, info)
             center3d_img = self.obtain_center3d_img(obj, info, calib)
@@ -189,7 +188,6 @@ class KITTIDataset(Dataset):
             if abs(depth - lpm[-1, keypoint[1], keypoint[0]]) > self.depth_diff_thresh: continue
 
             radius = gaussian_radius(size2d)
-            radius = max(0, int(radius))
             cls_id = self.cls_to_id[obj.cls_type]
             draw_umich_gaussian(target['heatmap'][cls_id], keypoint, radius)
 
@@ -239,36 +237,38 @@ class KITTIDataset(Dataset):
 
         return alpha
 
-    def obtain_pts_lidar_in_box3d(self, obj, info, calib, lpm_original):
-        lpm = lpm_original
+    def obtain_pts_img_in_box3d(self, obj, info, calib, lpm):
+        lpm = lpm.copy()
+        lpm = lpm.transpose(1, 2, 0)
         if info['flip_flag']:
-            lpm = lpm[:, ::-1, :]
-        lpm = cv2.warpAffine(lpm, M=info['affine_mat'], dsize=self.resolution, flags=cv2.INTER_NEAREST)
-        lpm = cv2.resize(lpm, self.feature_size, interpolation=cv2.INTER_NEAREST)
+            lpm[:, :, 0] *= -1
+        pts_lidar = calib.rect_to_lidar(lpm.reshape(-1, 3))
 
         center3d = obj.loc + [0, -obj.h / 2, 0]
         size3d = np.array([obj.h, obj.w, obj.l], dtype=np.float32)
         ry = obj.ry
-        pts_lidar = calib.rect_to_lidar(lpm.reshape(-1, 3))
         boxes_lidar = boxes3d_camera_to_lidar(np.array([*center3d, *size3d, ry]).reshape(-1, 7), calib)
+
         point_indices = points_in_boxes_cpu(
             torch.from_numpy(pts_lidar),
             torch.from_numpy(boxes_lidar),
         ).numpy()  # (nboxes, npoints)
+        pts_lidar_in_box3d = pts_lidar[point_indices[0] > 0]
 
-        return pts_lidar[point_indices[0] > 0]
-
-    def obtain_keypoint_by_lidar_points(self, obj, info, calib, pts_lidar_in_box3d, lpm, max_iters=10):
         pts_img, _ = calib.lidar_to_img(pts_lidar_in_box3d)
-        mean_u, mean_v = pts_img[:, 0].mean(), pts_img[:, 1].mean()
-        dis = np.sqrt((pts_img[:, 0] - mean_u) ** 2 + (pts_img[:, 1] - mean_v) ** 2)
-        indices = np.argsort(dis)
-        pts_img = pts_img[indices] if indices.shape[0] < max_iters else pts_img[indices[:max_iters]]
         if info['flip_flag']:
             pts_img[:, 0] = info['img_size'][0] - pts_img[:, 0]
         pts_img = affine_transform(pts_img, info['affine_mat'])
         pts_img /= self.downsample
         pts_img = pts_img.astype(np.int64)
+
+        return pts_img
+
+    def obtain_keypoint_by_lidar_points(self, obj, pts_img, lpm, max_iters=10):
+        mean_u, mean_v = pts_img[:, 0].mean(), pts_img[:, 1].mean()
+        dis = np.sqrt((pts_img[:, 0] - mean_u) ** 2 + (pts_img[:, 1] - mean_v) ** 2)
+        indices = np.argsort(dis)
+        pts_img = pts_img[indices] if indices.shape[0] < max_iters else pts_img[indices[:max_iters]]
 
         depth = obj.loc[-1]
         keypoint = pts_img[0]
