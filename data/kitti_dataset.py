@@ -8,7 +8,6 @@ from torch.utils.data import Dataset
 from data.kitti_object_eval_python.kitti_common import get_label_annos
 from data.kitti_object_eval_python.eval import get_official_eval_result
 from utils.encode_utils import angle_to_bin
-from utils.encode_utils import gaussian_radius
 from utils.encode_utils import draw_umich_gaussian
 from utils.affine_utils import get_affine_mat
 from utils.affine_utils import affine_transform
@@ -187,8 +186,8 @@ class KITTIDataset(Dataset):
             depth = box3d[2]
             if abs(depth - lpm[-1, keypoint[1], keypoint[0]]) > self.depth_diff_thresh: continue
 
-            radius = gaussian_radius(size2d)
             cls_id = self.cls_to_id[obj.cls_type]
+            radius = int(size2d.min() / 2)
             draw_umich_gaussian(target['heatmap'][cls_id], keypoint, radius)
 
             target['keypoint'][i] = keypoint
