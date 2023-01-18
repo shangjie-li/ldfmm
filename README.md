@@ -3,7 +3,7 @@
 Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
 
 ## Acknowledgement
- - This repository is developed based on [xinzhuma](https://github.com/xinzhuma/monodle)'s work.
+ - This repository is developed based on [xinzhuma](https://github.com/xinzhuma/monodle) and [open-mmlab](https://github.com/open-mmlab/OpenPCDet)'s work.
 
 ## Installation
  - Clone this repository
@@ -36,7 +36,9 @@ Implementation of LDFMM in PyTorch for KITTI 3D Object Detetcion
    │   │   │   ├──calib & velodyne & label_2 & image_2
    │   │   │── testing
    │   │   │   ├──calib & velodyne & image_2
+   ├── helpers
    ├── layers
+   ├── ops
    ├── utils
    ```
  - Display the dataset

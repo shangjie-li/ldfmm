@@ -2,19 +2,18 @@ import os
 import tqdm
 import numpy as np
 import torch
+from torch.nn.utils import clip_grad_norm_
 
 from helpers.checkpoint_helper import save_checkpoint
 from helpers.checkpoint_helper import load_checkpoint
 
 
 class Trainer(object):
-    def __init__(self, cfg, model, optimizer, lr_scheduler, warmup_lr_scheduler, train_loader, test_loader,
-                 logger, tb_logger):
+    def __init__(self, cfg, model, optimizer, lr_scheduler, train_loader, test_loader, logger, tb_logger):
         self.cfg = cfg
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.warmup_lr_scheduler = warmup_lr_scheduler
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.logger = logger
@@ -34,7 +33,7 @@ class Trainer(object):
                 logger=self.logger,
             )
             assert self.epoch is not None
-            self.lr_scheduler.last_epoch = self.epoch - 1
+            self.iter = self.epoch * len(self.train_loader)
 
     def train(self):
         start_epoch = self.epoch
@@ -47,11 +46,6 @@ class Trainer(object):
             np.random.seed(np.random.get_state()[1][0] + epoch)
             self.train_one_epoch()
             self.epoch += 1
-
-            if self.warmup_lr_scheduler is not None and epoch < 5:
-                self.warmup_lr_scheduler.step()
-            else:
-                self.lr_scheduler.step()
 
             if self.epoch % self.cfg['save_frequency'] == 0:
                 ckpt_dir = 'checkpoints'
@@ -74,15 +68,22 @@ class Trainer(object):
             targets = {key: val.to(self.device) for key, val in targets.items()}
             lidar_maps = lidar_maps.to(self.device)
 
+            self.lr_scheduler.step(self.iter)
+
+            try:
+                cur_lr = float(self.optimizer.lr)
+            except:
+                cur_lr = self.optimizer.param_groups[0]['lr']
             self.optimizer.zero_grad()
 
             outputs = self.model(inputs)
 
             total_loss, stats_dict = self.model.compute_loss(outputs, targets, lidar_maps)
             total_loss.backward()
+            clip_grad_norm_(self.model.parameters(), 10)
             self.optimizer.step()
 
-            self.tb_logger.add_scalar('learning_rate/learning_rate', self.optimizer.param_groups[0]['lr'], self.iter)
+            self.tb_logger.add_scalar('learning_rate/learning_rate', cur_lr, self.iter)
             self.tb_logger.add_scalar('loss/loss', total_loss.item(), self.iter)
             for key, val in stats_dict.items():
                 self.tb_logger.add_scalar('sub_loss/' + key, val, self.iter)

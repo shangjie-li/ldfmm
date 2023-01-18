@@ -15,7 +15,6 @@ from ldfmm import build_model
 from helpers.dataloader_helper import build_train_loader
 from helpers.dataloader_helper import build_test_loader
 from helpers.optimizer_helper import build_optimizer
-from helpers.scheduler_helper import build_lr_scheduler
 from helpers.logger_helper import create_logger
 from helpers.logger_helper import log_cfg
 from helpers.logger_helper import set_random_seed
@@ -60,15 +59,15 @@ def main():
     num_classes = len(cfg['dataset']['class_names'])
     model = build_model(cfg['model'], num_classes)
 
-    optimizer = build_optimizer(cfg['optimizer'], model)
-    lr_scheduler, warmup_lr_scheduler = build_lr_scheduler(cfg['lr_scheduler'], optimizer, last_epoch=-1)
+    total_iters_each_epoch = len(train_loader)
+    total_epochs = cfg['trainer']['max_epoch']
+    optimizer, lr_scheduler = build_optimizer(cfg['optimizer'], model, total_iters_each_epoch, total_epochs)
 
     trainer = Trainer(
         cfg=cfg['trainer'],
         model=model,
         optimizer=optimizer,
         lr_scheduler=lr_scheduler,
-        warmup_lr_scheduler=warmup_lr_scheduler,
         train_loader=train_loader,
         test_loader=test_loader,
         logger=logger,
