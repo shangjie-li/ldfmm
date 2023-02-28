@@ -40,7 +40,7 @@ def bin_to_angle(bin_id, residual_angle):
     return normalize_angle(angle)
 
 
-def nms(objects, calib, nms_thresh=0.1):
+def nms(objects, calib, nms_thresh):
     """
 
     Args:
@@ -67,7 +67,7 @@ def nms(objects, calib, nms_thresh=0.1):
     return selected
 
 
-def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
+def decode_detections(preds, infos, calibs, regress_box2d, score_thresh, nms_thresh):
     """
 
     Args:
@@ -76,6 +76,7 @@ def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
         calibs: list
         regress_box2d: bool
         score_thresh: float
+        nms_thresh: float
 
     Returns:
         det: dict
@@ -132,7 +133,7 @@ def decode_detections(preds, infos, calibs, regress_box2d, score_thresh=0.2):
 
             det_per_img.append([int(cls_id), alpha, *box2d, *size3d, *loc, ry, score])
 
-        selected_indices = nms(det_per_img, calib)
+        selected_indices = nms(det_per_img, calib, nms_thresh)
         det[img_id] = [obj for idx, obj in enumerate(det_per_img) if idx in selected_indices]
 
     return det

@@ -7,12 +7,12 @@ from utils.decode_utils import decode_detections
 
 
 class Tester(object):
-    def __init__(self, cfg, model, dataloader, result_dir, logger):
+    def __init__(self, cfg, model, data_loader, result_dir, logger):
         self.cfg = cfg
         self.model = model
-        self.dataloader = dataloader
-        self.max_objs = dataloader.dataset.max_objs
-        self.class_names = dataloader.dataset.class_names
+        self.data_loader = data_loader
+        self.max_objs = data_loader.dataset.max_objs
+        self.class_names = data_loader.dataset.class_names
         self.result_dir = result_dir
         self.logger = logger
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -32,10 +32,10 @@ class Tester(object):
         self.model.eval()
         all_det = {}
         progress_bar = tqdm.tqdm(
-            total=len(self.dataloader), dynamic_ncols=True, leave=True, desc='batches'
+            total=len(self.data_loader), dynamic_ncols=True, leave=True, desc='batches'
         )
 
-        for batch_idx, (inputs, _, infos, lidar_maps) in enumerate(self.dataloader):
+        for idx, (inputs, _, infos, lidar_maps) in enumerate(self.data_loader):
             inputs = inputs.to(self.device)
             lidar_maps = lidar_maps.to(self.device)
 
@@ -44,7 +44,7 @@ class Tester(object):
             preds = self.model.select_outputs(outputs, self.max_objs, lidar_maps)
             preds = {key: val.detach().cpu().numpy() for key, val in preds.items()}
             infos = {key: val.detach().cpu().numpy() for key, val in infos.items()}
-            calibs = [self.dataloader.dataset.get_calib(index) for index in infos['img_id']]
+            calibs = [self.data_loader.dataset.get_calib(index) for index in infos['img_id']]
 
             det = decode_detections(
                 preds=preds,
@@ -52,6 +52,7 @@ class Tester(object):
                 calibs=calibs,
                 regress_box2d=self.model.regress_box2d,
                 score_thresh=self.cfg['score_thresh'],
+                nms_thresh=self.cfg['nms_thresh'],
             )
             all_det.update(det)
 
@@ -70,13 +71,15 @@ class Tester(object):
             output_path = os.path.join(result_dir, '{:06d}.txt'.format(img_id))
             f = open(output_path, 'w')
             objs = all_det[img_id]
+
             for i in range(len(objs)):
                 class_name = self.class_names[int(objs[i][0])]
                 f.write('{} 0.0 0'.format(class_name))
                 for j in range(1, 14):
                     f.write(' {:.2f}'.format(objs[i][j]))
                 f.write('\n')
+
             f.close()
 
     def evaluate(self, result_dir):
-        self.dataloader.dataset.eval(result_dir=result_dir, logger=self.logger)
+        self.data_loader.dataset.eval(result_dir=result_dir, logger=self.logger)

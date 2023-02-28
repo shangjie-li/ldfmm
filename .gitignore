@@ -9,3 +9,7 @@ data/kitti/testing
 outputs
 checkpoints
 logs
+result.mp4
+result.txt
+results
+videos

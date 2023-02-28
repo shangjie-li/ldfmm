@@ -123,12 +123,15 @@ def run(dataset, args, img, target, info, lidar_projection_map):
     )
 
 
-def main():
+if __name__ == '__main__':
     args = parse_config()
     assert os.path.exists(args.cfg_file)
     cfg = yaml.load(open(args.cfg_file, 'r'), Loader=yaml.Loader)
 
-    dataset = KITTIDataset(cfg['dataset'], split=args.split, augment_data=args.augment_data)
+    if cfg['dataset']['type'] == 'KITTI':
+        dataset = KITTIDataset(cfg['dataset'], split=args.split, augment_data=args.augment_data)
+    else:
+        raise NotImplementedError
 
     if args.sample_idx is not None:
         assert args.sample_idx in dataset.id_list
@@ -142,7 +145,3 @@ def main():
             run(dataset, args, img, target, info, lidar_projection_map)
             progress_bar.update()
         progress_bar.close()
-
-
-if __name__ == '__main__':
-    main()

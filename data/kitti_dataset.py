@@ -13,7 +13,7 @@ from utils.affine_utils import get_affine_mat
 from utils.affine_utils import affine_transform
 from utils.kitti_object3d_utils import parse_objects
 from utils.kitti_calibration_utils import parse_calib
-from utils.point_clouds_utils import get_completed_lidar_projection_map
+from utils.point_cloud_utils import get_completed_lidar_projection_map
 from utils.box_utils import boxes3d_camera_to_lidar
 from ops.roiaware_pool3d.roiaware_pool3d_utils import points_in_boxes_cpu
 
@@ -251,7 +251,7 @@ class KITTIDataset(Dataset):
         point_indices = points_in_boxes_cpu(
             torch.from_numpy(pts_lidar),
             torch.from_numpy(boxes_lidar),
-        ).numpy()  # (nboxes, npoints)
+        ).numpy()  # [num_boxes, num_points]
         pts_lidar_in_box3d = pts_lidar[point_indices[0] > 0]
 
         pts_img, _ = calib.lidar_to_img(pts_lidar_in_box3d)

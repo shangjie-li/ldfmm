@@ -28,6 +28,8 @@ def parse_config():
                         help='must be chosen from ["train", "val", "trainval", "test"]')
     parser.add_argument('--score_thresh', type=float, default=None,
                         help='score threshold for filtering detections')
+    parser.add_argument('--nms_thresh', type=float, default=None,
+                        help='NMS threshold for filtering detections')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='path to the checkpoint')
     parser.add_argument('--show_boxes2d', action='store_true', default=False,
@@ -62,6 +64,7 @@ def run(model, dataset, args, cfg, img, lidar_projection_map, info, device):
         calibs=calibs,
         regress_box2d=model.regress_box2d,
         score_thresh=cfg['tester']['score_thresh'],
+        nms_thresh=cfg['tester']['nms_thresh'],
     )
 
     objects = det[img_id]
@@ -95,7 +98,7 @@ def run(model, dataset, args, cfg, img, lidar_projection_map, info, device):
     )
 
 
-def main():
+if __name__ == '__main__':
     args = parse_config()
     assert os.path.exists(args.cfg_file)
     cfg = yaml.load(open(args.cfg_file, 'r'), Loader=yaml.Loader)
@@ -104,10 +107,15 @@ def main():
         cfg['tester']['split'] = args.split
     if args.score_thresh is not None:
         cfg['tester']['score_thresh'] = args.score_thresh
+    if args.nms_thresh is not None:
+        cfg['tester']['nms_thresh'] = args.nms_thresh
     if args.checkpoint is not None:
         cfg['tester']['checkpoint'] = args.checkpoint
 
-    dataset = KITTIDataset(cfg['dataset'], split=cfg['tester']['split'], augment_data=False)
+    if cfg['dataset']['type'] == 'KITTI':
+        dataset = KITTIDataset(cfg['dataset'], split=cfg['tester']['split'], augment_data=False)
+    else:
+        raise NotImplementedError
 
     num_classes = len(cfg['dataset']['class_names'])
     model = build_model(cfg['model'], num_classes)
@@ -139,7 +147,3 @@ def main():
             run(model, dataset, args, cfg, img, lidar_projection_map, info, device)
             progress_bar.update()
         progress_bar.close()
-
-
-if __name__ == '__main__':
-    main()

@@ -9,13 +9,12 @@ from helpers.checkpoint_helper import load_checkpoint
 
 
 class Trainer(object):
-    def __init__(self, cfg, model, optimizer, lr_scheduler, train_loader, test_loader, logger, tb_logger):
+    def __init__(self, cfg, model, optimizer, lr_scheduler, data_loader, logger, tb_logger):
         self.cfg = cfg
         self.model = model
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.train_loader = train_loader
-        self.test_loader = test_loader
+        self.data_loader = data_loader
         self.logger = logger
         self.tb_logger = tb_logger
         self.epoch = 0
@@ -33,16 +32,16 @@ class Trainer(object):
                 logger=self.logger,
             )
             assert self.epoch is not None
-            self.iter = self.epoch * len(self.train_loader)
+            self.iter = self.epoch * len(self.data_loader)
 
     def train(self):
         start_epoch = self.epoch
         progress_bar = tqdm.tqdm(
-            range(start_epoch, self.cfg['max_epoch']), dynamic_ncols=True, leave=True,
+            range(start_epoch, self.cfg['epochs']), dynamic_ncols=True, leave=True,
             desc='epochs'
         )
 
-        for epoch in range(start_epoch, self.cfg['max_epoch']):
+        for epoch in range(start_epoch, self.cfg['epochs']):
             np.random.seed(np.random.get_state()[1][0] + epoch)
             self.train_one_epoch()
             self.epoch += 1
@@ -50,7 +49,7 @@ class Trainer(object):
             if self.epoch % self.cfg['save_frequency'] == 0:
                 ckpt_dir = 'checkpoints'
                 os.makedirs(ckpt_dir, exist_ok=True)
-                ckpt_name = os.path.join(ckpt_dir, 'checkpoint_epoch_%d' % self.epoch)
+                ckpt_name = os.path.join(ckpt_dir, 'checkpoint_epoch_%d.pth' % self.epoch)
                 save_checkpoint(ckpt_name, self.model, self.optimizer, self.epoch)
 
             progress_bar.update()
@@ -59,11 +58,11 @@ class Trainer(object):
     def train_one_epoch(self):
         self.model.train()
         progress_bar = tqdm.tqdm(
-            total=len(self.train_loader), dynamic_ncols=True, leave=(self.epoch + 1 == self.cfg['max_epoch']),
+            total=len(self.data_loader), dynamic_ncols=True, leave=(self.epoch + 1 == self.cfg['epochs']),
             desc='iters'
         )
 
-        for batch_idx, (inputs, targets, _, lidar_maps) in enumerate(self.train_loader):
+        for idx, (inputs, targets, _, lidar_maps) in enumerate(self.data_loader):
             inputs = inputs.to(self.device)
             targets = {key: val.to(self.device) for key, val in targets.items()}
             lidar_maps = lidar_maps.to(self.device)
@@ -79,6 +78,7 @@ class Trainer(object):
             outputs = self.model(inputs)
 
             total_loss, stats_dict = self.model.compute_loss(outputs, targets, lidar_maps)
+
             total_loss.backward()
             clip_grad_norm_(self.model.parameters(), 10)
             self.optimizer.step()

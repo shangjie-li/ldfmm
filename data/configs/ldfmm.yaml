@@ -24,10 +24,11 @@ optimizer:
 
 trainer:
   split: 'train'
-  max_epoch: 80
+  epochs: 80
   save_frequency: 80
 
 tester:
   split: 'val'
   score_thresh: 0.2
+  nms_thresh: 0.1
   checkpoint: 'checkpoints/checkpoint_epoch_80.pth'
