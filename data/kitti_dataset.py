@@ -19,7 +19,7 @@ from ops.roiaware_pool3d.roiaware_pool3d_utils import points_in_boxes_cpu
 
 
 class KITTIDataset(Dataset):
-    def __init__(self, cfg, split, augment_data=True):
+    def __init__(self, cfg, split, is_training=True, augment_data=True):
         self.root_dir = 'data/kitti'
         self.split = split
         self.class_names = cfg['class_names']
@@ -42,6 +42,7 @@ class KITTIDataset(Dataset):
         self.calib_dir = os.path.join(self.root_dir, 'calib')
         self.label_dir = os.path.join(self.root_dir, 'label_2')
 
+        self.is_training = is_training
         self.augment_data = augment_data
         if self.split not in ['train', 'trainval']:
             self.augment_data = False
@@ -200,7 +201,7 @@ class KITTIDataset(Dataset):
             target['cls_id'][i] = cls_id
             target['mask'][i] = 1
 
-        if self.split in ['train', 'trainval'] and target['mask'].sum() == 0:
+        if self.is_training and target['mask'].sum() == 0:
             new_idx = np.random.randint(self.__len__())
             return self.__getitem__(new_idx)
 

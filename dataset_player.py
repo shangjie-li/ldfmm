@@ -103,24 +103,30 @@ def run(dataset, args, img, target, info, lidar_projection_map):
     lpm = lidar_projection_map.transpose(1, 2, 0)  # (x, y, z) values in camera coordinates
     lpm = cv2.resize(lpm, dsize=dataset.resolution, interpolation=cv2.INTER_NEAREST)
 
-    mask = target['mask'].astype(np.bool)
-    heatmap = target['heatmap']
-    keypoints = target['keypoint'][mask]  # (u, v) of keypoints
-    boxes2d = target['box2d'][mask]  # (cu, cv, width, height) of bounding boxes
-    boxes3d = target['box3d'][mask]  # (x, y, z, h, w, l, ry) in camera coordinates
-    cls_ids = target['cls_id'][mask]
-    names = [dataset.class_names[idx] for idx in cls_ids]
+    if target is None:
+        visualize(
+            dataset, args, img, lpm, pts, img_id, info=info,
+        )
 
-    heatmap = np.stack([
-        cv2.resize(heatmap[k], dsize=dataset.resolution) for k in range(heatmap.shape[0])
-    ], axis=0)
-    keypoints *= dataset.downsample
-    boxes2d *= dataset.downsample
+    else:
+        mask = target['mask'].astype(np.bool)
+        heatmap = target['heatmap']
+        keypoints = target['keypoint'][mask]  # (u, v) of keypoints
+        boxes2d = target['box2d'][mask]  # (cu, cv, width, height) of bounding boxes
+        boxes3d = target['box3d'][mask]  # (x, y, z, h, w, l, ry) in camera coordinates
+        cls_ids = target['cls_id'][mask]
+        names = [dataset.class_names[idx] for idx in cls_ids]
 
-    visualize(
-        dataset, args, img, lpm, pts, img_id,
-        heatmap=heatmap, keypoints=keypoints, boxes2d=boxes2d, boxes3d=boxes3d, names=names, info=info,
-    )
+        heatmap = np.stack([
+            cv2.resize(heatmap[k], dsize=dataset.resolution) for k in range(heatmap.shape[0])
+        ], axis=0)
+        keypoints *= dataset.downsample
+        boxes2d *= dataset.downsample
+
+        visualize(
+            dataset, args, img, lpm, pts, img_id,
+            heatmap=heatmap, keypoints=keypoints, boxes2d=boxes2d, boxes3d=boxes3d, names=names, info=info,
+        )
 
 
 if __name__ == '__main__':
@@ -129,7 +135,7 @@ if __name__ == '__main__':
     cfg = yaml.load(open(args.cfg_file, 'r'), Loader=yaml.Loader)
 
     if cfg['dataset']['type'] == 'KITTI':
-        dataset = KITTIDataset(cfg['dataset'], split=args.split, augment_data=args.augment_data)
+        dataset = KITTIDataset(cfg['dataset'], split=args.split, is_training=False, augment_data=args.augment_data)
     else:
         raise NotImplementedError
 
