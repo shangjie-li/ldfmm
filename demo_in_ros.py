@@ -54,6 +54,8 @@ def parse_config():
                         help='NMS threshold for filtering detections')
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='path to the checkpoint')
+    parser.add_argument('--current_classes', type=str, default='0,1,2',
+                        help='a filter for desired classes, e.g., 0,1,2 (split by a comma)')
     parser.add_argument('--sub_image', type=str, default='/kitti/camera_color_left/image_raw',
                         help='image topic to subscribe')
     parser.add_argument('--sub_lidar', type=str, default='/kitti/velo/pointcloud',
@@ -222,20 +224,19 @@ def timer_callback(event):
     )
 
     objects = det[img_id]
-    num_objs = len(objects)
-    names = []
-    scores = []
-    boxes3d_camera = np.zeros((num_objs, 7), dtype=np.float32)
-
-    for k in range(num_objs):
+    boxes3d_camera, names, scores, = [], [], []
+    for k in range(len(objects)):
         obj = objects[k]
-        names.append(dataset.class_names[obj[0]])
-        scores.append(obj[-1])
+        cls_id = obj[0]
+        if cls_id not in args.current_classes: continue
 
         size3d, loc, ry = obj[6:9], obj[9:12], obj[12]
         center3d = np.array(loc) + [0, -size3d[0] / 2, 0]
-        boxes3d_camera[k] = np.array([*center3d, *size3d, ry], dtype=np.float32)
+        boxes3d_camera.append([*center3d, *size3d, ry])
+        names.append(dataset.class_names[cls_id])
+        scores.append(obj[-1])
 
+    boxes3d_camera = np.array(boxes3d_camera, dtype=np.float32).reshape(-1, 7)
     boxes3d_lidar = boxes3d_camera_to_lidar(boxes3d_camera, calib)
 
     publish_marker_msg(pub_marker, boxes3d_lidar, names, scores, args.frame_id, args.frame_rate, box_colormap)
@@ -265,6 +266,8 @@ if __name__ == '__main__':
         cfg['tester']['nms_thresh'] = args.nms_thresh
     if args.checkpoint is not None:
         cfg['tester']['checkpoint'] = args.checkpoint
+
+    args.current_classes = list(map(int, args.current_classes.split(',')))
 
     rospy.init_node("ldfmm", anonymous=True, disable_signals=True)
     frame = 0
