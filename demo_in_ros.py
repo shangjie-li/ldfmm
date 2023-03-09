@@ -70,7 +70,7 @@ def parse_config():
     return args
 
 
-def publish_marker_msg(pub, boxes, labels, frame_id, frame_rate, color_map):
+def publish_marker_msg(pub, boxes, labels, scores, frame_id, frame_rate, color_map):
     markerarray = MarkerArray()
     for i in range(boxes.shape[0]):
         marker = Marker()
@@ -97,7 +97,7 @@ def publish_marker_msg(pub, boxes, labels, frame_id, frame_rate, color_map):
         marker.color.r = color_map[labels[i]][2] / 255.0
         marker.color.g = color_map[labels[i]][1] / 255.0
         marker.color.b = color_map[labels[i]][0] / 255.0
-        marker.color.a = 0.75  # 0 for invisible
+        marker.color.a = scores[i]  # 0 for invisible
         
         marker.lifetime = rospy.Duration(1 / frame_rate)
         markerarray.markers.append(marker)
@@ -117,7 +117,7 @@ def display(img, v_writer, win_name='result'):
         return True
 
 
-def print_info(frame, stamp, delay, labels, scores, boxes, file_name='result.txt'):
+def print_info(frame, stamp, delay, boxes, labels, scores, file_name='result.txt'):
     time_str = 'frame:%d  stamp:%.3f  delay:%.3f' % (frame, stamp, delay)
     print(time_str)
     with open(file_name, 'a') as fob:
@@ -137,17 +137,14 @@ def print_info(frame, stamp, delay, labels, scores, boxes, file_name='result.txt
 
 def create_input_data(dataset, img, pts, calib, frame_id):
     img = img[:, :, ::-1]  # ndarray of uint8, [H, W, 3], RGB image
-
-    # lidar_projection_map: ndarray of float32, [H, W, 3], (x, y, z) values in camera coordinates
-    lpm = get_completed_lidar_projection_map(pts[:, :3], img, calib)
+    lpm = get_completed_lidar_projection_map(pts[:, :3], img, calib)  # ndarray of float32, [H, W, 3], (x, y, z)
 
     h, w, _ = img.shape
     img_size = np.array([w, h])
     center = img_size / 2
     aug_size = img_size
 
-    # affine_mat: ndarray of float, [2, 3]
-    affine_mat = get_affine_mat(center, aug_size, dataset.resolution)
+    affine_mat = get_affine_mat(center, aug_size, dataset.resolution)  # ndarray of float, [2, 3]
 
     img = cv2.warpAffine(img, M=affine_mat, dsize=dataset.resolution, flags=cv2.INTER_NEAREST)
     img = (img.astype(np.float32) / 255.0 - dataset.mean) / dataset.std
@@ -241,7 +238,7 @@ def timer_callback(event):
 
     boxes3d_lidar = boxes3d_camera_to_lidar(boxes3d_camera, calib)
 
-    publish_marker_msg(pub_marker, boxes3d_lidar, names, args.frame_id, args.frame_rate, box_colormap)
+    publish_marker_msg(pub_marker, boxes3d_lidar, names, scores, args.frame_id, args.frame_rate, box_colormap)
 
     if args.display:
         image = normalize_img(cur_image)
@@ -254,7 +251,7 @@ def timer_callback(event):
         cur_stamp = rospy.Time.now()
         cur_stamp = cur_stamp.secs + 0.000000001 * cur_stamp.nsecs
         delay = round(time.time() - start, 3)
-        print_info(frame, cur_stamp, delay, names, scores, boxes3d_lidar, result_file)
+        print_info(frame, cur_stamp, delay, boxes3d_lidar, names, scores, result_file)
 
 
 if __name__ == '__main__':
