@@ -61,38 +61,50 @@ def visualize(dataset, args, img, lpm, pts, img_id,
             names=names,
             window_name='%06d' % img_id
         )
-    elif heatmap is not None and args.show_heatmap:
-        data = {img_window_name: img, lpm_window_name: lpm}
-        for key, val in data.items():
-            opencv_vis_utils.draw_heatmap(
-                val,
+        return
+
+    data = {img_window_name: img, lpm_window_name: lpm}
+    if heatmap is not None and args.show_heatmap:
+        for k, v in data.items():
+            data[k] = opencv_vis_utils.draw_heatmap(
+                v,
                 heatmap,
                 dataset.class_names,
-                window_name=key,
-                wait_key=False,
             )
-        cv2.moveWindow(img_window_name, 0, 0)
-        cv2.moveWindow(lpm_window_name, 0, 450)
-        cv2.waitKey()
-        cv2.destroyAllWindows()
+            cv2.namedWindow(k, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(k, data[k].shape[1], data[k].shape[0])
+            cv2.imshow(k, data[k])
+
     else:
-        data = {img_window_name: img, lpm_window_name: lpm}
-        for key, val in data.items():
-            opencv_vis_utils.draw_scene(
-                val,
+        for k, v in data.items():
+            data[k] = opencv_vis_utils.draw_scene(
+                v,
                 calib,
                 keypoints=keypoints if keypoints is not None and args.show_keypoints else None,
                 boxes2d=boxes2d if boxes2d is not None and args.show_boxes2d else None,
                 boxes3d_camera=boxes3d if boxes3d is not None and args.show_boxes3d else None,
                 names=names,
                 info=info,
-                window_name=key,
-                wait_key=False,
             )
-        cv2.moveWindow(img_window_name, 0, 0)
-        cv2.moveWindow(lpm_window_name, 0, 450)
-        cv2.waitKey()
-        cv2.destroyAllWindows()
+            cv2.namedWindow(k, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(k, data[k].shape[1], data[k].shape[0])
+            cv2.imshow(k, data[k])
+
+    cv2.moveWindow(img_window_name, 0, 0)
+    cv2.moveWindow(lpm_window_name, 0, 450)
+
+    key = cv2.waitKey(0)
+    while key:
+        if key == 27:  # Esc
+            cv2.destroyAllWindows()
+            break
+        elif key == 13:  # Enter
+            for k, v in data.items():
+                cv2.imwrite(k + '.png', v)
+            cv2.destroyAllWindows()
+            break
+        else:
+            key = cv2.waitKey(0)
 
 
 def run(dataset, args, img, target, info, lidar_projection_map):

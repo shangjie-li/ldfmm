@@ -38,8 +38,7 @@ def normalize_img(img):
         raise NotImplementedError
 
 
-def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, names=None,
-               info=None, window_name='image', wait_key=True, enter_to_save=True):
+def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, names=None, info=None):
     """
     Show the image with 2D boxes or 3D boxes.
 
@@ -51,11 +50,9 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, na
         boxes3d_camera: ndarray of float32, [N, 7], (x, y, z, h, w, l, ry] in camera coordinates
         names: list of str, name of each object
         info: dict
-        window_name: str
-        wait_key: bool
-        enter_to_save: bool
 
     Returns:
+        img: ndarray of uint8, [H, W, 3]
 
     """
     if keypoints is not None:
@@ -67,23 +64,7 @@ def draw_scene(img, calib, keypoints=None, boxes2d=None, boxes3d_camera=None, na
     if boxes3d_camera is not None:
         img = draw_boxes3d(img, calib, boxes3d_camera, names, info)
 
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(window_name, img.shape[1], img.shape[0])
-    cv2.imshow(window_name, img)
-
-    if wait_key:
-        # Press 'Esc' to close this window, or 'Enter' to save the image.
-        key = cv2.waitKey(0)
-        while key:
-            if key == 27:  # Esc
-                cv2.destroyWindow(window_name)
-                break
-            elif enter_to_save and key == 13:  # Enter
-                cv2.imwrite(window_name + '.png', img)
-                cv2.destroyWindow(window_name)
-                break
-            else:
-                key = cv2.waitKey(0)
+    return img
 
 
 def draw_keypoints(img, keypoints, names=None, radius=1, color=(0, 255, 0), thickness=2):
@@ -169,8 +150,8 @@ def draw_boxes3d(img, calib, boxes3d_camera, names=None, info=None, color=(0, 25
         img: ndarray of uint8, [H, W, 3], BGR image
 
     """
-    for i in range(boxes3d_camera.shape[0]):
-        box3d_camera = boxes3d_camera[i].copy()
+    for m in range(boxes3d_camera.shape[0]):
+        box3d_camera = boxes3d_camera[m].copy()
         if info is not None:
             if info['flip_flag']:
                 box3d_camera[0] *= -1
@@ -190,7 +171,7 @@ def draw_boxes3d(img, calib, boxes3d_camera, names=None, info=None, color=(0, 25
             continue
 
         if names is not None:
-            color = box_colormap[names[i]]
+            color = box_colormap[names[m]]
 
         pts_img = corners_img.astype(np.int)
         cv2.line(img, (pts_img[0, 0], pts_img[0, 1]), (pts_img[5, 0], pts_img[5, 1]), color, thickness)
@@ -206,7 +187,7 @@ def draw_boxes3d(img, calib, boxes3d_camera, names=None, info=None, color=(0, 25
     return img
 
 
-def draw_heatmap(img, heatmap, names, window_name='image', wait_key=True, enter_to_save=True):
+def draw_heatmap(img, heatmap, names):
     """
     Show the image with the heatmap.
 
@@ -214,11 +195,9 @@ def draw_heatmap(img, heatmap, names, window_name='image', wait_key=True, enter_
         img: ndarray of uint8, [H, W, 3], BGR image
         heatmap: ndarray of float32, [C, H, W], heatmap (0 to 1)
         names: list of str, name corresponding to each channel of the heatmap
-        window_name: str
-        wait_key: bool
-        enter_to_save: bool
 
     Returns:
+        img: ndarray of uint8, [H, W, 3]
 
     """
     for i in range(heatmap.shape[0]):
@@ -228,20 +207,4 @@ def draw_heatmap(img, heatmap, names, window_name='image', wait_key=True, enter_
         img = img.astype(np.int64) + hm.astype(np.int64)
         img = np.clip(img, a_min=0, a_max=255).astype(np.uint8)
 
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(window_name, img.shape[1], img.shape[0])
-    cv2.imshow(window_name, img)
-
-    if wait_key:
-        # Press 'Esc' to close this window, or 'Enter' to save the image.
-        key = cv2.waitKey(0)
-        while key:
-            if key == 27:  # Esc
-                cv2.destroyWindow(window_name)
-                break
-            elif enter_to_save and key == 13:  # Enter
-                cv2.imwrite(window_name + '.png', img)
-                cv2.destroyWindow(window_name)
-                break
-            else:
-                key = cv2.waitKey(0)
+    return img
