@@ -72,13 +72,11 @@ def parse_config():
     return args
 
 
-def publish_marker_msg(pub, boxes, labels, scores, frame_id, frame_rate, color_map):
-    markerarray = MarkerArray()
+def publish_marker_msg(pub, boxes, labels, scores, header, frame_rate, color_map):
+    marker_array = MarkerArray()
     for i in range(boxes.shape[0]):
         marker = Marker()
-        marker.header = Header()
-        marker.header.frame_id = frame_id
-        marker.header.stamp = rospy.Time.now()
+        marker.header = header
         marker.ns = labels[i]
         marker.id = i
         marker.type = Marker.CUBE
@@ -102,9 +100,9 @@ def publish_marker_msg(pub, boxes, labels, scores, frame_id, frame_rate, color_m
         marker.color.a = scores[i]  # 0 for invisible
         
         marker.lifetime = rospy.Duration(1 / frame_rate)
-        markerarray.markers.append(marker)
+        marker_array.markers.append(marker)
         
-    pub.publish(markerarray)
+    pub.publish(marker_array)
 
 
 def display(img, v_writer, win_name='result'):
@@ -171,8 +169,7 @@ def create_input_data(dataset, img, pts, calib, frame_id):
 def image_callback(image):
     global image_header, image_frame
     image_lock.acquire()
-    if image_header is None:
-        image_header = image.header
+    image_header = image.header
     image_frame = np.frombuffer(image.data, dtype=np.uint8).reshape(image.height, image.width, -1)  # ndarray of uint8, [H, W, 3], BGR image
     image_lock.release()
 
@@ -180,14 +177,17 @@ def image_callback(image):
 def lidar_callback(lidar):
     global lidar_header, lidar_frame
     lidar_lock.acquire()
-    if lidar_header is None:
-        lidar_header = lidar.header
+    lidar_header = lidar.header
     lidar_frame = pointcloud2_to_xyzi_array(lidar, remove_nans=True)
     lidar_lock.release()
 
 
 def timer_callback(event):
+    cur_header = Header()
+
     image_lock.acquire()
+    cur_header.frame_id = image_header.frame_id
+    cur_header.stamp = image_header.stamp
     cur_image = image_frame.copy()
     image_lock.release()
 
@@ -239,7 +239,7 @@ def timer_callback(event):
     boxes3d_camera = np.array(boxes3d_camera, dtype=np.float32).reshape(-1, 7)
     boxes3d_lidar = boxes3d_camera_to_lidar(boxes3d_camera, calib)
 
-    publish_marker_msg(pub_marker, boxes3d_lidar, names, scores, args.frame_id, args.frame_rate, box_colormap)
+    publish_marker_msg(pub_marker, boxes3d_lidar, names, scores, cur_header, args.frame_rate, box_colormap)
 
     if args.display:
         image = normalize_img(cur_image)
