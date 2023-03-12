@@ -88,7 +88,7 @@ class KITTIDataset(Dataset):
         test_id = {'Car': 0, 'Pedestrian': 1, 'Cyclist': 2}
         for category in self.write_list:
             result_str = get_official_eval_result(
-                gt_annos, dt_annos, test_id[category], use_ldf_eval=False, print_info=False)
+                gt_annos, dt_annos, test_id[category], use_ldf_eval=True, print_info=False)
             logger.info(result_str)
 
     def __len__(self):

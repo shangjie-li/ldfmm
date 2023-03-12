@@ -4,7 +4,7 @@ dataset:
   type: 'KITTI'
   batch_size: 4
   class_names: ['Car', 'Pedestrian', 'Cyclist']
-  write_list: ['Car']
+  write_list: ['Car', 'Pedestrian', 'Cyclist']
   keypoint_encoding: 'LidarPoints'
   random_flip: 0.5
   random_crop: 0.5
