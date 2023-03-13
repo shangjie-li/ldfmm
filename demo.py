@@ -38,6 +38,8 @@ def parse_config():
                         help='whether to show 3D boxes')
     parser.add_argument('--show_lidar_points', action='store_true', default=False,
                         help='whether to show lidar point clouds')
+    parser.add_argument('--show_heatmap', action='store_true', default=False,
+                        help='whether to show the heatmap')
     parser.add_argument('--sample_idx', type=str, default=None,
                         help='index of the sample')
     args = parser.parse_args()
@@ -92,9 +94,14 @@ def run(model, dataset, args, cfg, img, lidar_projection_map, info, device):
     lpm = lidar_projection_map.transpose(1, 2, 0)  # (x, y, z) values in camera coordinates
     lpm = cv2.resize(lpm, dsize=img_size, interpolation=cv2.INTER_NEAREST)
 
+    heatmap = preds['heatmap'][0]
+    heatmap = np.stack([
+        cv2.resize(heatmap[k], dsize=img_size) for k in range(heatmap.shape[0])
+    ], axis=0)
+
     visualize(
         dataset, args, img, lpm, pts, img_id,
-        boxes2d=boxes2d, boxes3d=boxes3d, names=names,
+        heatmap=heatmap, boxes2d=boxes2d, boxes3d=boxes3d, names=names,
     )
 
 

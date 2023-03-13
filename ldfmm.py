@@ -87,10 +87,11 @@ class LDFMM(nn.Module):
         heatmaps = outputs['heatmap']
         batch_size = heatmaps.shape[0]
         heatmaps = torch.clamp(heatmaps.sigmoid_(), min=1e-4, max=1 - 1e-4)
-        heatmaps *= lidar_maps[:, 2:3, :, :] > 0
-        heatmaps = nms_heatmap(heatmaps)
 
-        scores, indices, cls_ids, xs, ys = select_topk(heatmaps, K=K)
+        refined_heatmaps = heatmaps * (lidar_maps[:, 2:3, :, :] > 0)
+        refined_heatmaps = nms_heatmap(refined_heatmaps)
+
+        scores, indices, cls_ids, xs, ys = select_topk(refined_heatmaps, K=K)
 
         offsets3d = get_poi(outputs['offset3d'], indices)
         centers3d_img = torch.stack([xs, ys], dim=2) + offsets3d
@@ -104,6 +105,7 @@ class LDFMM(nn.Module):
         alphas_res = get_poi(outputs['alpha_res'], indices)
 
         preds = {
+            'heatmap': heatmaps,
             'cls_id': cls_ids.view(batch_size, K, 1),
             'score': scores.view(batch_size, K, 1),
             'center3d_img': centers3d_img.view(batch_size, K, 2),
