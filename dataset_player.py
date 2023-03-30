@@ -49,7 +49,9 @@ def visualize(dataset, args, img, lpm, pts, img_id,
     img = opencv_vis_utils.normalize_img(img)
     img_window_name = 'img: %06d' % img_id
 
+    valid_mask = (lpm[:, :, 0:1] != 0) | (lpm[:, :, 1:2] != 0) | (lpm[:, :, 2:3] != 0)
     lpm = opencv_vis_utils.normalize_img(lpm)
+    lpm = np.zeros_like(lpm) + lpm * valid_mask
     lpm_window_name = 'lidar_projection_map: %06d' % img_id
 
     if pts is not None and args.show_lidar_points:
